@@ -180,8 +180,8 @@ export default function App() {
             <div className="pt-2">
               <SafetyInspectorPanel
                 selectedRoute={selectedRoute}
-                originName={originObj?.name || 'Origin'}
-                destName={destObj?.name || 'Destination'}
+                originName={originLocation?.name || 'Origin'}
+                destName={destLocation?.name || 'Destination'}
               />
             </div>
           </div>
@@ -196,14 +196,14 @@ export default function App() {
                 Full Safety Analytics & Corridor Breakdown
               </h2>
               <p className="text-xs text-slate-400">
-                Evaluating spatial parameters from {originObj?.name} to {destObj?.name} across 12 Mumbai police divisions.
+                Evaluating spatial parameters from {originLocation?.name} to {destLocation?.name} across 12 Mumbai police divisions.
               </p>
             </div>
 
             <SafetyInspectorPanel
               selectedRoute={selectedRoute}
-              originName={originObj?.name || 'Origin'}
-              destName={destObj?.name || 'Destination'}
+              originName={originLocation?.name || 'Origin'}
+              destName={destLocation?.name || 'Destination'}
             />
           </div>
         )}
