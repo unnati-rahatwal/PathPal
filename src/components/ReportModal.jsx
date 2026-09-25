@@ -93,12 +93,12 @@ export default function ReportModal({ isOpen, onClose, onAddReport }) {
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2 bg-[#0d1322] border border-slate-700/60 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400"
+                className="w-full px-3 py-2 bg-[#0d1322] border border-slate-700/60 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
               >
-                <option value="Streetlight Deficit">Streetlight Deficit / Dark Zone</option>
-                <option value="Police Patrol Active">Police Patrol / Pink Booth Active</option>
-                <option value="Isolated Construction Zone">Isolated Construction Zone</option>
-                <option value="Streetlight Restored">Streetlight Restored / Bright</option>
+                <option value="Streetlight Deficit" className="bg-[#0b1224] text-slate-100">Streetlight Deficit / Dark Zone</option>
+                <option value="Police Patrol Active" className="bg-[#0b1224] text-slate-100">Police Patrol / Pink Booth Active</option>
+                <option value="Isolated Construction Zone" className="bg-[#0b1224] text-slate-100">Isolated Construction Zone</option>
+                <option value="Streetlight Restored" className="bg-[#0b1224] text-slate-100">Streetlight Restored / Bright</option>
               </select>
             </div>
 
@@ -135,16 +135,16 @@ export default function ReportModal({ isOpen, onClose, onAddReport }) {
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold"
+                className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold cursor-pointer transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-cyan-500/20 hover:opacity-90"
+                className="px-5 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-lg shadow-cyan-400/30 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
               >
-                <Send className="w-3.5 h-3.5" />
-                Submit Live Report
+                <Send className="w-3.5 h-3.5 text-slate-950" />
+                <span>Submit Live Report</span>
               </button>
             </div>
           </form>

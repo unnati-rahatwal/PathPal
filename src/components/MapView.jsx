@@ -30,7 +30,8 @@ export default function MapView({
   setSelectedRouteId,
   originId,
   destId,
-  liveOSMNodes = []
+  liveOSMNodes = [],
+  reports = []
 }) {
   const [showLightingHeatmap, setShowLightingHeatmap] = useState(true);
   const [showPolicePosts, setShowPolicePosts] = useState(true);
@@ -123,7 +124,7 @@ export default function MapView({
   });
 
   return (
-    <div className="relative w-full h-[550px] rounded-2xl overflow-hidden glass-panel border border-white/10 shadow-2xl flex flex-col">
+    <div id="map-view-container" className="relative w-full h-[550px] rounded-2xl overflow-hidden glass-panel border border-white/10 shadow-2xl flex flex-col">
       {/* Top Left Layer Controls */}
       <div className="absolute top-3 left-3 z-[1000] bg-[#0c1220]/95 backdrop-blur-md p-2 rounded-xl border border-white/10 flex flex-wrap items-center gap-2 text-xs shadow-xl">
         <div className="flex items-center gap-1.5 px-2 py-1 text-slate-400 font-semibold border-r border-white/10">
@@ -209,13 +210,13 @@ export default function MapView({
               setIsSimulating(true);
             }
           }}
-          className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all ${
+          className={`px-3.5 py-1.5 rounded-lg font-black text-xs flex items-center gap-1.5 cursor-pointer transition-all ${
             isSimulating
-              ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
-              : 'bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 hover:opacity-90 shadow-lg shadow-cyan-500/20'
+              ? 'bg-amber-400 text-slate-950 hover:bg-amber-300'
+              : 'bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-lg shadow-cyan-400/30'
           }`}
         >
-          {isSimulating ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+          {isSimulating ? <Pause className="w-3.5 h-3.5 text-slate-950" /> : <Play className="w-3.5 h-3.5 text-slate-950" />}
           <span>{isSimulating ? 'Pause Journey' : 'Simulate Live Journey'}</span>
         </button>
         {simStepIndex > 0 && (
@@ -398,9 +399,19 @@ export default function MapView({
           </Marker>
         ))}
 
-        {/* Dark Zones and Hazards */}
+        {/* Dark Zones, Hazards & Live Supabase Reports */}
         {showHazards &&
-          DARK_ZONES_AND_HAZARDS.map((hz) => (
+          [
+            ...DARK_ZONES_AND_HAZARDS,
+            ...(reports || []).map((rep) => ({
+              id: rep.id,
+              title: rep.category || 'Live Commuter Alert',
+              locationName: rep.location,
+              lat: rep.lat || 19.0760 + (Math.random() * 0.04 - 0.02),
+              lng: rep.lng || 72.8777 + (Math.random() * 0.04 - 0.02),
+              advice: rep.comment
+            }))
+          ].map((hz) => (
             <Marker key={hz.id} position={[hz.lat, hz.lng]} icon={hazardIcon}>
               <Popup>
                 <div className="text-xs">

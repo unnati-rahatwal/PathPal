@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Navbar from './components/Navbar';
+import LandingHero from './components/LandingHero';
 import RouteSelector from './components/RouteSelector';
 import MapView from './components/MapView';
 import RouteCardList from './components/RouteCardList';
@@ -9,17 +10,31 @@ import ReportModal from './components/ReportModal';
 import SOSGuardModal from './components/SOSGuardModal';
 import { computeRoutes } from './services/routingEngine';
 import { fetchLiveMumbaiOSMData } from './services/overpassService';
-import { MUMBAI_LOCATIONS } from './data/mumbaiData';
+import { fetchOSRMRoute } from './services/osrmRoutingService';
+import { supabase, isSupabaseConfigured } from './services/supabaseClient';
+import { MUMBAI_LOCATIONS, INITIAL_COMMUNITY_REPORTS } from './data/mumbaiData';
+import { MessageSquarePlus } from 'lucide-react';
 
 export default function App() {
-  // Active Tab state ('planner', 'inspector', 'community')
-  const [activeTab, setActiveTab] = useState('planner');
+  // Active Tab state ('home', 'planner', 'inspector', 'community')
+  const [activeTab, setActiveTab] = useState('home');
+
+  // Community Reports state with live Supabase sync
+  const [reports, setReports] = useState(INITIAL_COMMUNITY_REPORTS);
 
   // Navigation & Location state
   const [originId, setOriginId] = useState('bkc');
   const [destId, setDestId] = useState('dadar_stn');
+  const [viaId, setViaId] = useState('');
   const [travelMode, setTravelMode] = useState('Auto/Cab');
   const [activeProfile, setActiveProfile] = useState('solo_female');
+
+  // Dynamic custom location objects (from Nominatim / GPS)
+  const [customOrigin, setCustomOrigin] = useState(null);
+  const [customDest, setCustomDest] = useState(null);
+
+  // Live OSRM Road Polyline state
+  const [osrmData, setOsrmData] = useState(null);
 
   // Commuter preferences state
   const [preferences, setPreferences] = useState({
@@ -42,6 +57,50 @@ export default function App() {
 
   // Live Mumbai Time state
   const [mumbaiTime, setMumbaiTime] = useState('');
+
+  // Fetch live reports from Supabase if table exists, subscribe to realtime updates
+  useEffect(() => {
+    if (isSupabaseConfigured && supabase) {
+      supabase
+        .from('reports')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .then(({ data, error }) => {
+          if (!error && data && data.length > 0) {
+            setReports(data);
+          }
+        });
+
+      const channel = supabase
+        .channel('public:reports')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'reports' },
+          (payload) => {
+            if (payload.new) {
+              setReports((prev) => [payload.new, ...prev]);
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, []);
+
+  const handleAddReport = async (newReport) => {
+    setReports((prev) => [newReport, ...prev]);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('reports').insert([newReport]);
+      } catch (err) {
+        console.warn('Supabase report save fallback:', err);
+      }
+    }
+  };
 
   // Fetch Live OpenStreetMap nodes for Mumbai on mount
   useEffect(() => {
@@ -69,6 +128,18 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Fetch live OSRM road polyline whenever origin or destination changes
+  useEffect(() => {
+    const activeOrigin = customOrigin || MUMBAI_LOCATIONS.find((l) => l.id === originId) || MUMBAI_LOCATIONS[0];
+    const activeDest = customDest || MUMBAI_LOCATIONS.find((l) => l.id === destId) || MUMBAI_LOCATIONS[1];
+
+    if (activeOrigin && activeDest) {
+      fetchOSRMRoute(activeOrigin, activeDest).then((data) => {
+        if (data) setOsrmData(data);
+      });
+    }
+  }, [originId, destId, customOrigin, customDest]);
+
   // Update preferences when profile preset changes
   useEffect(() => {
     if (activeProfile === 'solo_female') {
@@ -87,24 +158,30 @@ export default function App() {
     setPreferences((prev) => ({ ...prev, travelMode }));
   }, [travelMode]);
 
-  // Compute 3 routes whenever inputs change
+  // Compute routes whenever inputs or OSRM data change
+  const activeOrigin = customOrigin || MUMBAI_LOCATIONS.find((l) => l.id === originId) || MUMBAI_LOCATIONS[0];
+  const activeDest = customDest || MUMBAI_LOCATIONS.find((l) => l.id === destId) || MUMBAI_LOCATIONS[1];
+
   const routes = useMemo(() => {
-    return computeRoutes(originId, destId, preferences);
-  }, [originId, destId, preferences]);
+    return computeRoutes(activeOrigin, activeDest, preferences, osrmData);
+  }, [activeOrigin, activeDest, preferences, osrmData]);
 
   const selectedRoute = useMemo(() => {
     return routes.find((r) => r.id === selectedRouteId) || routes[0];
   }, [routes, selectedRouteId]);
 
-  const originObj = MUMBAI_LOCATIONS.find((l) => l.id === originId);
-  const destObj = MUMBAI_LOCATIONS.find((l) => l.id === destId);
+  const originObj = activeOrigin;
+  const destObj = activeDest;
 
   const handleSelectPreset = (preset) => {
+    setCustomOrigin(null);
+    setCustomDest(null);
     setOriginId(preset.originId);
     setDestId(preset.destId);
     setTravelMode(preset.travelMode);
     if (preset.commuterType.includes('Female')) setActiveProfile('solo_female');
     setSelectedRouteId('safest');
+    setActiveTab('planner');
   };
 
   return (
@@ -120,7 +197,17 @@ export default function App() {
 
       {/* Main Content Area with Generous Spacing */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 pb-12">
-        {/* TAB 1: Route Planner & Map */}
+        {/* TAB 0: Home & Landing Hero */}
+        {activeTab === 'home' && (
+          <LandingHero
+            onLaunchPlanner={() => setActiveTab('planner')}
+            onOpenSOS={() => setIsSOSOpen(true)}
+            onOpenReportModal={() => setIsReportModalOpen(true)}
+            mumbaiTime={mumbaiTime}
+          />
+        )}
+
+        {/* TAB 1: Route Planner & Interactive Map */}
         {activeTab === 'planner' && (
           <div className="space-y-6">
             {/* Top Workspace Grid: Planner Form (5 cols) + Interactive Map (7 cols) */}
@@ -131,6 +218,8 @@ export default function App() {
                   setOriginId={setOriginId}
                   destId={destId}
                   setDestId={setDestId}
+                  viaId={viaId}
+                  setViaId={setViaId}
                   travelMode={travelMode}
                   setTravelMode={setTravelMode}
                   activeProfile={activeProfile}
@@ -139,6 +228,10 @@ export default function App() {
                   setPreferences={setPreferences}
                   onSelectPreset={handleSelectPreset}
                   onRecalculate={() => setSelectedRouteId('safest')}
+                  customOrigin={customOrigin}
+                  setCustomOrigin={setCustomOrigin}
+                  customDest={customDest}
+                  setCustomDest={setCustomDest}
                 />
               </div>
 
@@ -150,6 +243,7 @@ export default function App() {
                   originId={originId}
                   destId={destId}
                   liveOSMNodes={liveOSMNodes}
+                  reports={reports}
                 />
               </div>
             </div>
@@ -209,13 +303,13 @@ export default function App() {
               </div>
               <button
                 onClick={() => setIsReportModalOpen(true)}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 hover:opacity-90 transition-all"
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 hover:opacity-90 transition-all cursor-pointer"
               >
                 + Submit Live Update
               </button>
             </div>
 
-            <CommunityAlertFeed onOpenReportModal={() => setIsReportModalOpen(true)} />
+            <CommunityAlertFeed reports={reports} onOpenReportModal={() => setIsReportModalOpen(true)} />
           </div>
         )}
       </main>
@@ -223,20 +317,29 @@ export default function App() {
       {/* Footer */}
       <footer className="bg-[#040710] border-t border-white/5 py-6 text-center text-xs text-slate-500 mt-auto px-4">
         <p className="max-w-4xl mx-auto">
-          Balikaman: Smart Night-Time Route Planning Engine for Mumbai Commuters • Connected live to OpenStreetMap & OpenSpatial APIs.
+          PathPal: Smart Night-Time Route Planning Engine for Mumbai Commuters • Connected live to OpenStreetMap & OpenSpatial APIs.
         </p>
       </footer>
+      {/* Persistent Floating Action Button: + Submit Live Report */}
+      <button
+        onClick={() => setIsReportModalOpen(true)}
+        className="fixed bottom-6 right-6 z-[1200] px-5 py-3.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-2xl shadow-amber-400/50 hover:scale-105 active:scale-95 transition-all cursor-pointer border border-amber-200/80"
+      >
+        <MessageSquarePlus className="w-4 h-4 text-slate-950 fill-current animate-pulse" />
+        <span>+ Submit Live Report</span>
+      </button>
 
       {/* Modals */}
       <ReportModal
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
-        onAddReport={() => {}}
+        onAddReport={handleAddReport}
       />
 
       <SOSGuardModal
         isOpen={isSOSOpen}
         onClose={() => setIsSOSOpen(false)}
+        liveOSMNodes={liveOSMNodes}
       />
     </div>
   );

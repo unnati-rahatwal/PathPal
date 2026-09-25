@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { MessageSquare, ThumbsUp, MapPin, AlertCircle, PlusCircle, CheckCircle2 } from 'lucide-react';
 import { INITIAL_COMMUNITY_REPORTS } from '../data/mumbaiData';
 
-export default function CommunityAlertFeed({ onOpenReportModal }) {
-  const [reports, setReports] = useState(INITIAL_COMMUNITY_REPORTS);
+export default function CommunityAlertFeed({ reports: propReports, onOpenReportModal }) {
+  const [localReports, setLocalReports] = useState(INITIAL_COMMUNITY_REPORTS);
+  const reports = propReports || localReports;
 
   const handleUpvote = (id) => {
-    setReports((prev) =>
+    setLocalReports((prev) =>
       prev.map((rep) =>
-        rep.id === id ? { ...rep, upvotes: rep.upvotes + 1 } : rep
+        rep.id === id ? { ...rep, upvotes: (rep.upvotes || 0) + 1 } : rep
       )
     );
   };
