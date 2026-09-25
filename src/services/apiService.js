@@ -154,11 +154,40 @@ export async function submitCommunityReport(report) {
   });
 }
 
-// ── Free-form address search (Local + OSM Nominatim) ─────────────────────────
+// ── Google Maps Platform Services ───────────────────────────────────────────
+
+export async function fetchGoogleStatus() {
+  try {
+    return await apiFetch('/api/google/status');
+  } catch {
+    return { google_configured: false };
+  }
+}
+
+export async function fetchGoogleSafeHavens(lat, lng, radius = 2500) {
+  return apiFetch(`/api/google/safe-havens?lat=${lat}&lng=${lng}&radius=${radius}`);
+}
+
+export async function fetchGoogleStreetViewPreview(lat, lng) {
+  return apiFetch(`/api/google/streetview-preview?lat=${lat}&lng=${lng}`);
+}
+
+// ── Hybrid Address Search (Google Places + OSM Nominatim + Curated) ──────────
 export async function searchAddresses(query) {
   if (!query || query.trim().length < 2) return [];
   const q = query.trim();
 
+  // 1. Try Google Places Autocomplete first via Backend
+  try {
+    const gData = await apiFetch(`/api/google/search?q=${encodeURIComponent(q)}`);
+    if (gData && gData.results && gData.results.length > 0) {
+      return gData.results;
+    }
+  } catch (err) {
+    // Google API not configured or offline, fallback to OSM Nominatim
+  }
+
+  // 2. OpenStreetMap Nominatim Fallback
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + ', Mumbai')}&viewbox=72.75,19.32,73.05,18.88&bounded=1&limit=6`;
     const res = await fetch(url, {
@@ -185,4 +214,5 @@ export async function searchAddresses(query) {
   }
   return [];
 }
+
 

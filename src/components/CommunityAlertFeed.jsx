@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, ThumbsUp, MapPin, AlertCircle, PlusCircle, CheckCircle2 } from 'lucide-react';
-import { INITIAL_COMMUNITY_REPORTS } from '../data/mumbaiData';
+import { MessageSquare, ThumbsUp, MapPin, AlertCircle, PlusCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { fetchCommunityReports } from '../services/apiService';
 
 export default function CommunityAlertFeed({ onOpenReportModal }) {
-  const [reports, setReports] = useState(INITIAL_COMMUNITY_REPORTS);
+  const [reports, setReports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {

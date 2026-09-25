@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Navigation, Car, Bike, Footprints, Bus, Zap, ArrowUpDown, Sliders, ChevronDown, ChevronUp, Sun, ShieldAlert, AlertOctagon, Clock } from 'lucide-react';
-import { MUMBAI_LOCATIONS, PRESET_ROUTES } from '../data/mumbaiData';
+import { Navigation, Car, Bike, Footprints, Bus, ArrowUpDown, Sliders, ChevronDown, ChevronUp, Sun, ShieldAlert, AlertOctagon, Clock } from 'lucide-react';
 import LocationSearchInput from './LocationSearchInput';
 
 export default function RouteSelector({
@@ -14,7 +13,6 @@ export default function RouteSelector({
   setActiveProfile,
   preferences,
   setPreferences,
-  onSelectPreset,
   onRecalculate
 }) {
   const [showPreferences, setShowPreferences] = useState(false);
@@ -88,7 +86,7 @@ export default function RouteSelector({
           value={originLocation}
           onChange={setOriginLocation}
           color="emerald"
-          placeholder="Search any Mumbai street, station, or landmark..."
+          placeholder="Search any Mumbai street, building, station, or landmark..."
           excludeId={destLocation?.id}
         />
 
@@ -110,7 +108,7 @@ export default function RouteSelector({
           value={destLocation}
           onChange={setDestLocation}
           color="cyan"
-          placeholder="Search destination address or neighborhood..."
+          placeholder="Search destination building, mall, or neighborhood..."
           excludeId={originLocation?.id}
         />
       </div>
@@ -161,26 +159,6 @@ export default function RouteSelector({
               </option>
             ))}
           </select>
-        </div>
-      </div>
-
-      {/* Preset Quick Chips */}
-      <div className="mb-4">
-        <label className="text-[11px] font-bold text-slate-400 mb-1.5 flex items-center gap-1 block uppercase tracking-wider">
-          <Zap className="w-3.5 h-3.5 text-amber-400" />
-          Popular Mumbai Night Routes
-        </label>
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-          {PRESET_ROUTES.map((preset) => (
-            <button
-              key={preset.id}
-              onClick={() => onSelectPreset(preset)}
-              className="px-2.5 py-1.5 rounded-lg bg-[#060a14] hover:bg-white/10 border border-white/5 text-[11px] text-slate-300 whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0"
-            >
-              <span className="text-cyan-400 font-bold">➔</span>
-              <span>{preset.title}</span>
-            </button>
-          ))}
         </div>
       </div>
 
@@ -254,7 +232,7 @@ export default function RouteSelector({
                 }`}
               >
                 <span className="flex items-center gap-1">
-                  <AlertOctagon className="w-3 h-3 text-cyan-400" /> Bypass Dark Alleys
+                  <AlertOctagon className="w-3.5 h-3.5 text-cyan-400" /> Bypass Dark Alleys
                 </span>
                 <span>{preferences.avoidIsolated ? 'ON' : 'OFF'}</span>
               </button>

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Search, X, Loader2, Sparkles, Navigation2 } from 'lucide-react';
-import { MUMBAI_LOCATIONS } from '../data/mumbaiData';
+import { MapPin, Search, X, Loader2, Sparkles, Navigation2, Building2 } from 'lucide-react';
 import { searchAddresses } from '../services/apiService';
 
 export default function LocationSearchInput({
@@ -8,23 +7,22 @@ export default function LocationSearchInput({
   value,
   onChange,
   color = 'emerald', // 'emerald' or 'cyan'
-  placeholder = 'Search address, locality, or landmark in Mumbai...',
+  placeholder = 'Search any building, society, landmark, or street in Mumbai...',
   excludeId = null
 }) {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [nominatimResults, setNominatimResults] = useState([]);
+  const [results, setResults] = useState([]);
   const containerRef = useRef(null);
 
-  // Sync input text when value changes from outside (e.g. Preset button or Swap)
+  // Sync input text when value changes from outside (e.g. preset or swap)
   useEffect(() => {
     if (value) {
       if (typeof value === 'object' && value.name) {
         setQuery(value.name);
       } else if (typeof value === 'string') {
-        const found = MUMBAI_LOCATIONS.find((l) => l.id === value);
-        if (found) setQuery(found.name);
+        setQuery(value);
       }
     }
   }, [value]);
@@ -40,20 +38,10 @@ export default function LocationSearchInput({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Filter local landmarks immediately
-  const localMatches = query.trim()
-    ? MUMBAI_LOCATIONS.filter(
-        (loc) =>
-          loc.id !== excludeId &&
-          (loc.name.toLowerCase().includes(query.toLowerCase()) ||
-            loc.category.toLowerCase().includes(query.toLowerCase()))
-      )
-    : MUMBAI_LOCATIONS.filter((loc) => loc.id !== excludeId).slice(0, 6);
-
-  // Debounced search for OSM Nominatim geocoding
+  // Debounced live search (Google Places & OSM Nominatim)
   useEffect(() => {
     if (!isOpen || query.trim().length < 2) {
-      setNominatimResults([]);
+      setResults([]);
       setIsLoading(false);
       return;
     }
@@ -61,18 +49,17 @@ export default function LocationSearchInput({
     const timer = setTimeout(async () => {
       setIsLoading(true);
       try {
-        const results = await searchAddresses(query);
-        // Exclude results identical to excludeId if known
-        setNominatimResults(results);
+        const res = await searchAddresses(query);
+        setResults(res.filter((r) => r.id !== excludeId));
       } catch (err) {
-        console.warn('Geocoding error:', err);
+        console.warn('Location search error:', err);
       } finally {
         setIsLoading(false);
       }
-    }, 350);
+    }, 280);
 
     return () => clearTimeout(timer);
-  }, [query, isOpen]);
+  }, [query, isOpen, excludeId]);
 
   const handleSelect = (loc) => {
     onChange(loc);
@@ -96,7 +83,7 @@ export default function LocationSearchInput({
         {isLoading && (
           <span className="text-[10px] text-cyan-400 flex items-center gap-1 font-mono lowercase">
             <Loader2 className="w-2.5 h-2.5 animate-spin" />
-            searching OSM...
+            searching places...
           </span>
         )}
       </label>
@@ -131,71 +118,49 @@ export default function LocationSearchInput({
       </div>
 
       {/* Autocomplete Dropdown List */}
-      {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1.5 bg-[#090e1c] border border-cyan-500/30 rounded-xl shadow-2xl z-[1500] max-h-72 overflow-y-auto divide-y divide-white/5 backdrop-blur-xl">
-          {/* Quick curated landmarks */}
-          {localMatches.length > 0 && (
-            <div className="p-2">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-amber-400" />
-                <span>Curated Night Corridors & Hubs</span>
-              </div>
-              {localMatches.map((loc) => (
-                <button
-                  key={loc.id}
-                  type="button"
-                  onClick={() => handleSelect(loc)}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5 flex items-center justify-between transition-colors group"
-                >
-                  <div className="min-w-0 pr-2">
-                    <div className="text-xs font-bold text-slate-200 group-hover:text-white truncate">
-                      {loc.name}
+      {isOpen && query.trim().length >= 2 && (
+        <div className="absolute left-0 right-0 top-full mt-1.5 bg-[#090e1c] border border-cyan-500/30 rounded-xl shadow-2xl z-[1500] max-h-72 overflow-y-auto divide-y divide-white/5 backdrop-blur-xl animate-fade-in">
+          {results.length > 0 ? (
+            <div className="p-2 space-y-1">
+              {results.map((loc) => {
+                const isGoogle = loc.source === 'google_places';
+                return (
+                  <button
+                    key={loc.id}
+                    type="button"
+                    onClick={() => handleSelect(loc)}
+                    className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-cyan-500/10 flex items-center justify-between transition-colors group"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <div className="text-xs font-bold text-slate-100 group-hover:text-cyan-300 truncate flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        <span>{loc.name}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 truncate pl-5">
+                        {loc.category}
+                      </div>
                     </div>
-                    <div className="text-[10px] text-slate-400 truncate">
-                      {loc.category} • Safety {loc.lightingIndex}%
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 shrink-0 border border-cyan-500/20">
-                    Preset
-                  </span>
-                </button>
-              ))}
+                    <span
+                      className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold shrink-0 ${
+                        isGoogle
+                          ? 'bg-blue-500/15 text-blue-300 border border-blue-500/30'
+                          : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                      }`}
+                    >
+                      {isGoogle ? 'Google' : 'OSM'}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-          )}
-
-          {/* OpenStreetMap Nominatim Live Geocoding Results */}
-          {nominatimResults.length > 0 && (
-            <div className="p-2 bg-[#060a14]/60">
-              <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider px-2 py-1 flex items-center gap-1">
-                <Navigation2 className="w-3 h-3 text-cyan-400" />
-                <span>Live OpenStreetMap Matches ({nominatimResults.length})</span>
-              </div>
-              {nominatimResults.map((loc) => (
-                <button
-                  key={loc.id}
-                  type="button"
-                  onClick={() => handleSelect(loc)}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-cyan-500/10 flex items-center justify-between transition-colors group"
-                >
-                  <div className="min-w-0 pr-2">
-                    <div className="text-xs font-bold text-cyan-100 group-hover:text-cyan-300 truncate">
-                      {loc.name}
-                    </div>
-                    <div className="text-[10px] text-slate-400 truncate">
-                      {loc.category}
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-mono text-emerald-400 shrink-0 font-bold">
-                    OSM
-                  </span>
-                </button>
-              ))}
+          ) : isLoading ? (
+            <div className="py-6 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+              <span>Searching Mumbai buildings & addresses...</span>
             </div>
-          )}
-
-          {localMatches.length === 0 && nominatimResults.length === 0 && !isLoading && (
+          ) : (
             <div className="py-4 text-center text-xs text-slate-400">
-              No matching address found in Mumbai. Try entering a nearby junction or road name.
+              No matching address found. Try entering a nearby road, station, or landmark.
             </div>
           )}
         </div>

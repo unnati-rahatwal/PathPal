@@ -3,7 +3,6 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap } from
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Shield, Sun, AlertTriangle, Fuel, Layers, Navigation, Play, Pause, RotateCcw, Map } from 'lucide-react';
-import { MUMBAI_LOCATIONS, SAFE_HAVENS, DARK_ZONES_AND_HAZARDS } from '../data/mumbaiData';
 
 // Fix Leaflet default marker icon path issue in Vite React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -30,8 +29,6 @@ export default function MapView({
   setSelectedRouteId,
   originLocation,
   destLocation,
-  originId,
-  destId,
   liveOSMNodes = [],
   isLoadingRoutes = false
 }) {
@@ -47,8 +44,8 @@ export default function MapView({
   const [isSimulating, setIsSimulating] = useState(false);
   const [simStepIndex, setSimStepIndex] = useState(0);
 
-  const origin = originLocation || MUMBAI_LOCATIONS.find((l) => l.id === originId) || MUMBAI_LOCATIONS[0];
-  const dest = destLocation || MUMBAI_LOCATIONS.find((l) => l.id === destId) || MUMBAI_LOCATIONS[1];
+  const origin = originLocation || { name: 'Start Location', lat: 19.0688, lng: 72.8703 };
+  const dest = destLocation || { name: 'Destination', lat: 19.0178, lng: 72.8478 };
 
   const mapCenter = [(origin.lat + dest.lat) / 2, (origin.lng + dest.lng) / 2];
   const currentSelectedRoute = routes.find((r) => r.id === selectedRouteId) || routes[0];
@@ -348,82 +345,28 @@ export default function MapView({
           </Marker>
         )}
 
-        {/* Streetlight density heat halos */}
-        {showLightingHeatmap &&
-          MUMBAI_LOCATIONS.map((loc) => (
-            <Circle
-              key={`light_halo_${loc.id}`}
-              center={[loc.lat, loc.lng]}
-              radius={750}
-              pathOptions={{
-                fillColor: '#F59E0B',
-                fillOpacity: (loc.lightingIndex / 100) * 0.18,
-                color: '#F59E0B',
-                weight: 0.8,
-                opacity: 0.3
-              }}
-            />
-          ))}
-
-        {/* Police Posts & Chowkis */}
-        {showPolicePosts &&
-          SAFE_HAVENS.filter((sh) => sh.type.includes('Police') || sh.type.includes('Pink'))
-            .map((sh) => (
-              <Marker key={sh.id} position={[sh.lat, sh.lng]} icon={policeIcon}>
-                <Popup>
-                  <div className="text-xs">
-                    <strong className="text-blue-400">{sh.name}</strong>
-                    <div className="text-[11px] text-slate-300 mt-1">Status: {sh.openHours}</div>
-                    <div className="text-[10px] text-slate-400 font-mono mt-1">Call: {sh.contact}</div>
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
-
-        {/* 24/7 Safe Havens */}
+        {/* Live Verified Safe Havens & Police Stations (Overpass + Google Places) */}
         {showSafeHavens &&
-          SAFE_HAVENS.filter((sh) => !sh.type.includes('Police') && !sh.type.includes('Pink'))
-            .map((sh) => (
-              <Marker key={sh.id} position={[sh.lat, sh.lng]} icon={safeHavenIcon}>
+          liveOSMNodes.map((node) => {
+            const isPolice = node.type?.toLowerCase().includes('police') || node.category?.toLowerCase().includes('police');
+            if (isPolice && !showPolicePosts) return null;
+            return (
+              <Marker
+                key={node.id}
+                position={[node.lat, node.lng]}
+                icon={isPolice ? policeIcon : safeHavenIcon}
+              >
                 <Popup>
                   <div className="text-xs">
-                    <strong className="text-emerald-400">{sh.name}</strong>
-                    <div className="text-[11px] text-slate-300 mt-1">Safe Haven • {sh.openHours}</div>
-                    <div className="text-[10px] text-slate-400 font-mono mt-1">Helpline: {sh.contact}</div>
+                    <strong className={isPolice ? 'text-blue-400' : 'text-emerald-400'}>{node.name}</strong>
+                    <div className="text-[11px] text-slate-300 mt-1">{node.category || node.type}</div>
+                    {node.open_hours && <div className="text-[10px] text-slate-400 mt-0.5">Hours: {node.open_hours}</div>}
+                    {node.rating && <div className="text-[10px] text-amber-400 font-bold mt-0.5">Rating: {node.rating} ★</div>}
                   </div>
                 </Popup>
               </Marker>
-            ))}
-
-        {/* Live OSM Fetched Nodes */}
-        {liveOSMNodes.map((node) => (
-          <Marker
-            key={node.id}
-            position={[node.lat, node.lng]}
-            icon={node.type === 'Police Station' ? policeIcon : safeHavenIcon}
-          >
-            <Popup>
-              <div className="text-xs">
-                <strong className="text-emerald-400">{node.name}</strong>
-                <div className="text-[11px] text-slate-300 mt-1">{node.type} • Live OSM</div>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-
-        {/* Dark Zones and Hazards */}
-        {showHazards &&
-          DARK_ZONES_AND_HAZARDS.map((hz) => (
-            <Marker key={hz.id} position={[hz.lat, hz.lng]} icon={hazardIcon}>
-              <Popup>
-                <div className="text-xs">
-                  <strong className="text-red-400">⚠️ {hz.title}</strong>
-                  <div className="text-[11px] text-slate-200 font-medium mt-1">{hz.locationName}</div>
-                  <p className="text-slate-400 text-[10px] mt-1">{hz.advice}</p>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+            );
+          })}
       </MapContainer>
     </div>
   );

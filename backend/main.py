@@ -344,6 +344,54 @@ def invalidate_cache():
     return {"message": "Cache invalidated. Graph re-downloading in background."}
 
 
+# ── Google Maps Platform Endpoints ───────────────────────────────────────────
+
+import google_services
+
+@app.get("/api/google/status")
+def get_google_api_status():
+    """Check if Google Maps API Key is configured."""
+    is_configured = google_services.is_google_api_configured()
+    return {
+        "status": "ok",
+        "google_configured": is_configured,
+        "features": {
+            "places_autocomplete": is_configured,
+            "verified_safe_havens": is_configured,
+            "streetview_preview": is_configured,
+        }
+    }
+
+
+@app.get("/api/google/search")
+def google_places_search(q: str = Query(..., min_length=2)):
+    """Search addresses & colloquial landmarks via Google Places Autocomplete."""
+    results = google_services.search_places_autocomplete(q)
+    return {"status": "ok", "results": results, "count": len(results)}
+
+
+@app.get("/api/google/safe-havens")
+def google_verified_safe_havens(
+    lat: float = Query(..., ge=-90, le=90),
+    lng: float = Query(..., ge=-180, le=180),
+    radius: int = Query(2500, ge=500, le=10000)
+):
+    """Retrieve verified 24/7 safe havens with live open_now status near coordinates."""
+    havens = google_services.fetch_verified_safe_havens(lat, lng, radius_meters=radius)
+    return {"status": "ok", "havens": havens, "count": len(havens)}
+
+
+@app.get("/api/google/streetview-preview")
+def google_streetview_preview(
+    lat: float = Query(..., ge=-90, le=90),
+    lng: float = Query(..., ge=-180, le=180)
+):
+    """Retrieve Street View metadata & inspection image URL for visual safety checks."""
+    preview = google_services.get_street_view_preview(lat, lng)
+    return {"status": "ok", "preview": preview}
+
+
+
 # ── Dev entrypoint ────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
