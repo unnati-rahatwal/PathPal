@@ -6,7 +6,8 @@ export default function Navbar({
   setActiveTab,
   onOpenSOS,
   onOpenReportModal,
-  mumbaiTime
+  mumbaiTime,
+  backendStatus = { connected: false, nodes: 0, edges: 0 }
 }) {
   const NAV_TABS = [
     { id: 'planner', label: 'Route Planner & Map', icon: Compass },
@@ -61,6 +62,14 @@ export default function Navbar({
 
         {/* Action Controls & Live Clock */}
         <div className="flex items-center gap-3">
+          {/* OSMnx Status Badge */}
+          {backendStatus?.connected && (
+            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-cyan-300 text-[11px] font-mono font-semibold">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse inline-block shadow-[0_0_6px_#00F0FF]" />
+              <span>OSMnx Live ({Math.round(backendStatus.nodes / 1000)}k nodes)</span>
+            </div>
+          )}
+
           {/* Live Mumbai Time Indicator */}
           <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs font-bold font-mono">
             <span className="live-dot" />

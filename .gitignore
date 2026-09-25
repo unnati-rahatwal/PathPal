@@ -26,3 +26,15 @@ dist
 *.njsproj
 *.sln
 *.sw?
+
+# Python & Backend Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pkl
+backend/cache/
+backend/.env
+.venv/
+venv/
+ENV/
+

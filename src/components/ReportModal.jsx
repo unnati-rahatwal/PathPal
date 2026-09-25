@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Send, MapPin, AlertTriangle, Sun, CheckCircle2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { submitCommunityReport } from '../services/apiService';
 
 export default function ReportModal({ isOpen, onClose, onAddReport }) {
   const [location, setLocation] = useState('');
@@ -11,11 +12,11 @@ export default function ReportModal({ isOpen, onClose, onAddReport }) {
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!location || !comment) return;
 
-    onAddReport({
+    const reportObj = {
       id: `rep_${Date.now()}`,
       user: 'You (Live Commuter)',
       badge: 'Verified Commuter',
@@ -26,7 +27,17 @@ export default function ReportModal({ isOpen, onClose, onAddReport }) {
       status: category.includes('Restored') ? 'Positive Alert' : 'Caution Alert',
       comment,
       upvotes: 1
-    });
+    };
+
+    try {
+      await submitCommunityReport(reportObj);
+    } catch (err) {
+      console.warn('Backend report submission fallback:', err);
+    }
+
+    if (onAddReport) {
+      onAddReport(reportObj);
+    }
 
     confetti({
       particleCount: 50,

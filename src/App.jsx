@@ -7,17 +7,17 @@ import SafetyInspectorPanel from './components/SafetyInspectorPanel';
 import CommunityAlertFeed from './components/CommunityAlertFeed';
 import ReportModal from './components/ReportModal';
 import SOSGuardModal from './components/SOSGuardModal';
+import { fetchRoutes, fetchSafeHavens, fetchGraphHealth } from './services/apiService';
 import { computeRoutes } from './services/routingEngine';
-import { fetchLiveMumbaiOSMData } from './services/overpassService';
 import { MUMBAI_LOCATIONS } from './data/mumbaiData';
 
 export default function App() {
   // Active Tab state ('planner', 'inspector', 'community')
   const [activeTab, setActiveTab] = useState('planner');
 
-  // Navigation & Location state
-  const [originId, setOriginId] = useState('bkc');
-  const [destId, setDestId] = useState('dadar_stn');
+  // Navigation & Location state (supports curated spots + any arbitrary OSM searched address)
+  const [originLocation, setOriginLocation] = useState(MUMBAI_LOCATIONS[0]); // Bandra-Kurla Complex (BKC)
+  const [destLocation, setDestLocation] = useState(MUMBAI_LOCATIONS[1]);     // Dadar Station
   const [travelMode, setTravelMode] = useState('Auto/Cab');
   const [activeProfile, setActiveProfile] = useState('solo_female');
 
@@ -29,6 +29,11 @@ export default function App() {
     preferPoliceChowkis: true,
     travelMode: 'Auto/Cab'
   });
+
+  // Computed routes state (initialized with offline fallback, updated via OSMnx backend)
+  const [routes, setRoutes] = useState(() => computeRoutes(originLocation.id || 'bkc', destLocation.id || 'dadar_stn', preferences));
+  const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
+  const [backendStatus, setBackendStatus] = useState({ connected: false, nodes: 0, edges: 0 });
 
   // Selected route state
   const [selectedRouteId, setSelectedRouteId] = useState('safest');
@@ -43,65 +48,75 @@ export default function App() {
   // Live Mumbai Time state
   const [mumbaiTime, setMumbaiTime] = useState('');
 
-  // Fetch Live OpenStreetMap nodes for Mumbai on mount
+  // 1. Health check & Graph status
   useEffect(() => {
-    fetchLiveMumbaiOSMData().then((nodes) => {
-      if (nodes && nodes.length > 0) {
-        setLiveOSMNodes(nodes);
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', {
-        timeZone: 'Asia/Kolkata',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true
+    fetchGraphHealth()
+      .then((res) => {
+        if (res?.graph?.status === 'ready') {
+          setBackendStatus({
+            connected: true,
+            nodes: res.graph.nodes || 94658,
+            edges: res.graph.edges || 224207
+          });
+        }
+      })
+      .catch(() => {
+        setBackendStatus({ connected: false, nodes: 0, edges: 0 });
       });
-      setMumbaiTime(timeStr);
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
   }, []);
 
-  // Update preferences when profile preset changes
+  // 2. Fetch Live Safe Havens from backend Overpass API
   useEffect(() => {
-    if (activeProfile === 'solo_female') {
-      setPreferences((prev) => ({ ...prev, safetyPriority: 88, avoidIsolated: true, lightPreference: true }));
-    } else if (activeProfile === 'late_shift') {
-      setPreferences((prev) => ({ ...prev, safetyPriority: 75, preferPoliceChowkis: true }));
-    } else if (activeProfile === 'two_wheeler') {
-      setPreferences((prev) => ({ ...prev, safetyPriority: 65, lightPreference: true }));
-    } else {
-      setPreferences((prev) => ({ ...prev, safetyPriority: 70 }));
-    }
-  }, [activeProfile]);
+    fetchSafeHavens()
+      .then((havens) => {
+        if (havens && havens.length > 0) {
+          setLiveOSMNodes(havens);
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not fetch live OSM safe havens from backend:', err);
+      });
+  }, []);
 
-  // Keep travelMode synced with preferences
+  // 3. Recompute routes via OSMnx backend whenever origin, destination, or preferences change
   useEffect(() => {
-    setPreferences((prev) => ({ ...prev, travelMode }));
-  }, [travelMode]);
+    if (!originLocation || !destLocation) return;
 
-  // Compute 3 routes whenever inputs change
-  const routes = useMemo(() => {
-    return computeRoutes(originId, destId, preferences);
-  }, [originId, destId, preferences]);
+    let isMounted = true;
+    setIsLoadingRoutes(true);
+
+    fetchRoutes(originLocation, destLocation, preferences)
+      .then((computed) => {
+        if (isMounted && computed && computed.length > 0) {
+          setRoutes(computed);
+          setIsLoadingRoutes(false);
+        }
+      })
+      .catch((err) => {
+        console.warn('Backend routing failed, using fallback engine:', err);
+        if (isMounted) {
+          setRoutes(computeRoutes(originLocation.id || 'bkc', destLocation.id || 'dadar_stn', preferences));
+          setIsLoadingRoutes(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [originLocation, destLocation, preferences]);
 
   const selectedRoute = useMemo(() => {
     return routes.find((r) => r.id === selectedRouteId) || routes[0];
   }, [routes, selectedRouteId]);
 
-  const originObj = MUMBAI_LOCATIONS.find((l) => l.id === originId);
-  const destObj = MUMBAI_LOCATIONS.find((l) => l.id === destId);
+  const originObj = originLocation;
+  const destObj = destLocation;
 
   const handleSelectPreset = (preset) => {
-    setOriginId(preset.originId);
-    setDestId(preset.destId);
+    const o = MUMBAI_LOCATIONS.find((l) => l.id === preset.originId) || MUMBAI_LOCATIONS[0];
+    const d = MUMBAI_LOCATIONS.find((l) => l.id === preset.destId) || MUMBAI_LOCATIONS[1];
+    setOriginLocation(o);
+    setDestLocation(d);
     setTravelMode(preset.travelMode);
     if (preset.commuterType.includes('Female')) setActiveProfile('solo_female');
     setSelectedRouteId('safest');
@@ -116,6 +131,7 @@ export default function App() {
         onOpenSOS={() => setIsSOSOpen(true)}
         onOpenReportModal={() => setIsReportModalOpen(true)}
         mumbaiTime={mumbaiTime}
+        backendStatus={backendStatus}
       />
 
       {/* Main Content Area with Generous Spacing */}
@@ -127,10 +143,10 @@ export default function App() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               <div className="lg:col-span-5">
                 <RouteSelector
-                  originId={originId}
-                  setOriginId={setOriginId}
-                  destId={destId}
-                  setDestId={setDestId}
+                  originLocation={originLocation}
+                  setOriginLocation={setOriginLocation}
+                  destLocation={destLocation}
+                  setDestLocation={setDestLocation}
                   travelMode={travelMode}
                   setTravelMode={setTravelMode}
                   activeProfile={activeProfile}
@@ -147,9 +163,14 @@ export default function App() {
                   routes={routes}
                   selectedRouteId={selectedRouteId}
                   setSelectedRouteId={setSelectedRouteId}
-                  originId={originId}
-                  destId={destId}
+                  originLocation={originLocation}
+                  destLocation={destLocation}
+                  onPickLocation={({ type, loc }) => {
+                    if (type === 'origin') setOriginLocation(loc);
+                    if (type === 'dest') setDestLocation(loc);
+                  }}
                   liveOSMNodes={liveOSMNodes}
+                  isLoadingRoutes={isLoadingRoutes}
                 />
               </div>
             </div>

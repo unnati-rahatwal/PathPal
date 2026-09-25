@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { MapPin, Navigation, Car, Bike, Footprints, Bus, Zap, ArrowUpDown, Sliders, ChevronDown, ChevronUp, Sun, ShieldAlert, AlertOctagon, Clock } from 'lucide-react';
 import { MUMBAI_LOCATIONS, PRESET_ROUTES } from '../data/mumbaiData';
+import LocationSearchInput from './LocationSearchInput';
 
 export default function RouteSelector({
-  originId,
-  setOriginId,
-  destId,
-  setDestId,
+  originLocation,
+  setOriginLocation,
+  destLocation,
+  setDestLocation,
   travelMode,
   setTravelMode,
   activeProfile,
@@ -41,9 +42,9 @@ export default function RouteSelector({
   ];
 
   const handleSwap = () => {
-    const temp = originId;
-    setOriginId(destId);
-    setDestId(temp);
+    const temp = originLocation;
+    setOriginLocation(destLocation);
+    setDestLocation(temp);
   };
 
   const handlePrefChange = (key, value) => {
@@ -79,34 +80,23 @@ export default function RouteSelector({
         </div>
       </div>
 
-      {/* Start Location & Destination Search Inputs with Swap Button */}
+      {/* Start Location & Destination Free-Form Search Inputs with Swap Button */}
       <div className="space-y-3 mb-4 relative">
         {/* Start Location */}
-        <div>
-          <label className="text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1.5 uppercase tracking-wider">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block shadow-[0_0_6px_#10B981]" />
-            Start Location (Origin)
-          </label>
-          <div className="relative">
-            <MapPin className="w-4 h-4 text-emerald-400 absolute left-3.5 top-3.5 pointer-events-none" />
-            <select
-              value={originId}
-              onChange={(e) => setOriginId(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-[#060a14] border border-slate-700/60 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all cursor-pointer shadow-inner"
-            >
-              {MUMBAI_LOCATIONS.map((loc) => (
-                <option key={loc.id} value={loc.id} disabled={loc.id === destId}>
-                  {loc.name} — {loc.category}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <LocationSearchInput
+          label="Start Location (Origin)"
+          value={originLocation}
+          onChange={setOriginLocation}
+          color="emerald"
+          placeholder="Search any Mumbai street, station, or landmark..."
+          excludeId={destLocation?.id}
+        />
 
         {/* Swap Button Floating Center */}
         <div className="flex justify-center -my-1 z-10 relative">
           <button
             onClick={handleSwap}
+            type="button"
             className="w-8 h-8 rounded-full bg-[#0d1527] border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-400 flex items-center justify-center transition-all shadow-md active:scale-95"
             title="Swap Origin & Destination"
           >
@@ -115,26 +105,14 @@ export default function RouteSelector({
         </div>
 
         {/* Destination */}
-        <div>
-          <label className="text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1.5 uppercase tracking-wider">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 inline-block shadow-[0_0_6px_#00F0FF]" />
-            Destination
-          </label>
-          <div className="relative">
-            <MapPin className="w-4 h-4 text-cyan-400 absolute left-3.5 top-3.5 pointer-events-none" />
-            <select
-              value={destId}
-              onChange={(e) => setDestId(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-[#060a14] border border-slate-700/60 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all cursor-pointer shadow-inner"
-            >
-              {MUMBAI_LOCATIONS.map((loc) => (
-                <option key={loc.id} value={loc.id} disabled={loc.id === originId}>
-                  {loc.name} — {loc.category}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <LocationSearchInput
+          label="Destination"
+          value={destLocation}
+          onChange={setDestLocation}
+          color="cyan"
+          placeholder="Search destination address or neighborhood..."
+          excludeId={originLocation?.id}
+        />
       </div>
 
       {/* Travel Mode & Night Time Row */}

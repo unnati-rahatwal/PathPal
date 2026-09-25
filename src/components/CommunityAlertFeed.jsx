@@ -1,9 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MessageSquare, ThumbsUp, MapPin, AlertCircle, PlusCircle, CheckCircle2 } from 'lucide-react';
 import { INITIAL_COMMUNITY_REPORTS } from '../data/mumbaiData';
+import { fetchCommunityReports } from '../services/apiService';
 
 export default function CommunityAlertFeed({ onOpenReportModal }) {
   const [reports, setReports] = useState(INITIAL_COMMUNITY_REPORTS);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    setIsLoading(true);
+    fetchCommunityReports()
+      .then((data) => {
+        if (data && data.length > 0) {
+          setReports(data);
+        }
+        setIsLoading(false);
+      })
+      .catch(() => {
+        setIsLoading(false);
+      });
+  }, []);
 
   const handleUpvote = (id) => {
     setReports((prev) =>

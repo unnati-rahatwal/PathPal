@@ -1,0 +1,20 @@
+# PathPal Backend - Python FastAPI + OSMnx Safety Routing Engine
+
+# Web framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+
+# OSM graph + routing
+osmnx>=1.9.0
+networkx>=3.3
+
+# Data & geo
+numpy>=1.26.0
+shapely>=2.0.0
+
+# HTTP & utils
+requests>=2.32.0
+python-dotenv>=1.0.0
+
+# Type hints
+pydantic>=2.0.0
