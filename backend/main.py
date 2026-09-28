@@ -20,17 +20,22 @@ Run:
 from __future__ import annotations
 
 import logging
+import os
+import sys
 import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
+
+# Ensure backend directory is in sys.path when running from workspace root
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from dotenv import load_dotenv
 load_dotenv()
 
-import os
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
