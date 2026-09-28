@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Navigation,
   Car,
@@ -14,15 +14,10 @@ import {
   AlertOctagon,
   Clock,
   Sparkles,
-  Zap,
-  Locate,
-  Loader2,
-  CheckCircle2
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
 import LocationSearchInput from './LocationSearchInput';
-import { MUMBAI_LOCATIONS, PRESET_ROUTES } from '../data/mumbaiData';
-import { getCurrentUserLocation } from '../services/locationService';
-import { isSupabaseConfigured, supabase } from '../services/supabaseClient';
 
 export default function RouteSelector({
   originLocation,
@@ -39,26 +34,7 @@ export default function RouteSelector({
 }) {
   const [showPreferences, setShowPreferences] = useState(false);
   const [nightTime, setNightTime] = useState('12:00 AM');
-  const [isLocatingGPS, setIsLocatingGPS] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
-
-  // Dynamic Popular Corridors State
-  const [popularCorridors, setPopularCorridors] = useState(PRESET_ROUTES);
-
-  // Fetch live popular routes from Supabase if configured
-  useEffect(() => {
-    if (isSupabaseConfigured && supabase) {
-      supabase
-        .from('popular_routes')
-        .select('*')
-        .limit(6)
-        .then(({ data, error }) => {
-          if (!error && data && data.length > 0) {
-            setPopularCorridors(data);
-          }
-        });
-    }
-  }, []);
 
   const TRAVEL_MODES = [
     { id: 'Auto/Cab', label: 'Cab / Auto', icon: Car, etaBadge: 'Fastest' },
@@ -124,53 +100,6 @@ export default function RouteSelector({
     }));
   };
 
-  const handleSelectGPSLocation = async () => {
-    setIsLocatingGPS(true);
-    try {
-      const loc = await getCurrentUserLocation();
-      const gpsObj = {
-        id: 'user_gps',
-        name: 'My Current Location (GPS)',
-        category: `Current GPS (${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)})`,
-        lat: loc.lat,
-        lng: loc.lng,
-        lightingIndex: 90
-      };
-      setOriginLocation(gpsObj);
-    } catch (err) {
-      alert('Could not retrieve GPS location. Please ensure location permissions are granted.');
-    } finally {
-      setIsLocatingGPS(false);
-    }
-  };
-
-  const handleSelectPresetRoute = (preset) => {
-    const orig = MUMBAI_LOCATIONS.find((l) => l.id === preset.originId) || {
-      id: preset.originId,
-      name: preset.title?.split('➔')[0]?.trim() || 'Origin',
-      category: 'Mumbai Landmark',
-      lat: 19.0657,
-      lng: 72.8687,
-      lightingIndex: 90
-    };
-    const dst = MUMBAI_LOCATIONS.find((l) => l.id === preset.destId) || {
-      id: preset.destId,
-      name: preset.title?.split('➔')[1]?.trim() || 'Destination',
-      category: 'Mumbai Landmark',
-      lat: 19.0178,
-      lng: 72.8478,
-      lightingIndex: 88
-    };
-
-    setOriginLocation(orig);
-    setDestLocation(dst);
-    if (preset.travelMode) setTravelMode(preset.travelMode);
-    if (preset.commuterType?.includes('Female')) {
-      handleProfileSelect('solo_female');
-    }
-    if (onRecalculate) onRecalculate();
-  };
-
   const handleCalculateClick = () => {
     setIsCalculating(true);
     if (onRecalculate) onRecalculate();
@@ -194,7 +123,7 @@ export default function RouteSelector({
             Night Journey Input & Parameters
           </h2>
           <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-            Search origin, destination & personal safety priorities
+            Search any address via Google Places / OSM & customize safety preferences
           </p>
         </div>
       </div>
@@ -231,25 +160,8 @@ export default function RouteSelector({
         </div>
       </div>
 
-      {/* Start Location, Swap Button, and Destination Search Inputs */}
+      {/* Start Location, Swap Button, and Destination Free-Form Search Inputs */}
       <div className="space-y-3 mb-4 relative bg-[#060a14] p-4 rounded-xl border border-white/5">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Route Endpoints</span>
-          <button
-            type="button"
-            onClick={handleSelectGPSLocation}
-            disabled={isLocatingGPS}
-            className="text-[10px] text-emerald-400 font-bold hover:text-emerald-300 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 cursor-pointer"
-          >
-            {isLocatingGPS ? (
-              <Loader2 className="w-3 h-3 animate-spin text-emerald-400" />
-            ) : (
-              <Locate className="w-3 h-3 text-emerald-400" />
-            )}
-            <span>{isLocatingGPS ? 'Getting GPS...' : 'Use My GPS'}</span>
-          </button>
-        </div>
-
         {/* Start Location */}
         <LocationSearchInput
           label="Start Location (Origin)"
@@ -261,7 +173,7 @@ export default function RouteSelector({
         />
 
         {/* Swap Button */}
-        <div className="flex justify-end -my-1 z-10 relative px-2">
+        <div className="flex justify-center -my-1 z-10 relative">
           <button
             type="button"
             onClick={handleSwap}
@@ -274,7 +186,7 @@ export default function RouteSelector({
 
         {/* Destination */}
         <LocationSearchInput
-          label="Destination (Target)"
+          label="Destination"
           value={destLocation}
           onChange={setDestLocation}
           color="cyan"
@@ -299,17 +211,14 @@ export default function RouteSelector({
                   key={mode.id}
                   type="button"
                   onClick={() => setTravelMode(mode.id)}
-                  className={`py-2 px-2.5 rounded-xl border text-[11px] font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                  className={`py-2 px-2.5 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     isSelected
                       ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-500/10'
                       : 'bg-[#060a14] border-white/5 text-slate-400 hover:text-slate-200 hover:border-white/10'
                   }`}
                 >
-                  <div className="flex items-center gap-1.5">
-                    <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-cyan-400' : 'text-slate-400'}`} />
-                    <span className="truncate">{mode.label}</span>
-                  </div>
-                  <span className="text-[9px] text-slate-500 font-normal">{mode.etaBadge}</span>
+                  <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-cyan-400' : 'text-slate-400'}`} />
+                  <span className="truncate">{mode.label}</span>
                 </button>
               );
             })}
@@ -325,7 +234,7 @@ export default function RouteSelector({
           <select
             value={nightTime}
             onChange={(e) => setNightTime(e.target.value)}
-            className="w-full px-3 py-3 bg-[#060a14] border border-slate-700/60 rounded-xl text-xs font-bold text-slate-200 focus:outline-none focus:border-cyan-400 cursor-pointer"
+            className="w-full px-3 py-2.5 bg-[#060a14] border border-slate-700/60 rounded-xl text-xs font-bold text-slate-200 focus:outline-none focus:border-cyan-400 cursor-pointer"
           >
             {NIGHT_TIMES.map((time, idx) => (
               <option key={idx} value={time}>
@@ -333,30 +242,6 @@ export default function RouteSelector({
               </option>
             ))}
           </select>
-          <p className="text-[10px] text-slate-500 mt-1 font-medium">
-            Streetlight illumination metrics dynamically update based on time.
-          </p>
-        </div>
-      </div>
-
-      {/* Preset Quick Corridors */}
-      <div>
-        <label className="text-[11px] font-bold text-slate-400 mb-1.5 flex items-center gap-1 uppercase tracking-wider">
-          <Zap className="w-3.5 h-3.5 text-amber-400" />
-          Popular Commuter Corridors (Live)
-        </label>
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-          {popularCorridors.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              onClick={() => handleSelectPresetRoute(preset)}
-              className="px-3 py-1.5 rounded-xl bg-[#060a14] hover:bg-white/10 border border-white/10 text-[11px] text-slate-300 whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 hover:border-cyan-400/40 cursor-pointer"
-            >
-              <span className="text-cyan-400 font-bold">➔</span>
-              <span>{preset.title}</span>
-            </button>
-          ))}
         </div>
       </div>
 
@@ -434,7 +319,7 @@ export default function RouteSelector({
                 }`}
               >
                 <span className="flex items-center gap-1.5">
-                  <AlertOctagon className="w-3.5 h-3.5 text-cyan-400" /> Bypass Alleys
+                  <AlertOctagon className="w-3.5 h-3.5 text-cyan-400" /> Bypass Dark Alleys
                 </span>
                 <span className="font-bold">{preferences.avoidIsolated ? 'ON' : 'OFF'}</span>
               </button>
@@ -455,7 +340,7 @@ export default function RouteSelector({
         ) : (
           <Navigation className="w-4 h-4 text-slate-950 fill-current" />
         )}
-        <span>{isCalculating ? 'Computing Dijkstra Corridors...' : 'Calculate Optimal Safe Corridors'}</span>
+        <span>{isCalculating ? 'Computing Corridors via OSMnx...' : 'Calculate Optimal Safe Corridors'}</span>
       </button>
     </div>
   );

@@ -9,9 +9,7 @@ import CommunityAlertFeed from './components/CommunityAlertFeed';
 import ReportModal from './components/ReportModal';
 import SOSGuardModal from './components/SOSGuardModal';
 import { fetchRoutes, fetchSafeHavens, fetchGraphHealth } from './services/apiService';
-import { computeRoutes } from './services/routingEngine';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
-import { SAFE_HAVENS, INITIAL_COMMUNITY_REPORTS } from './data/mumbaiData';
 import { MessageSquarePlus } from 'lucide-react';
 
 export default function App() {
@@ -19,24 +17,20 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('home');
 
   // Community Reports state with live Supabase sync
-  const [reports, setReports] = useState(INITIAL_COMMUNITY_REPORTS);
+  const [reports, setReports] = useState([]);
 
   // Navigation & Location state (dynamic search & pin coordinates)
   const [originLocation, setOriginLocation] = useState({
-    id: 'bkc',
     name: 'Bandra Kurla Complex (BKC)',
     category: 'Commercial Hub, Bandra East',
     lat: 19.0688,
-    lng: 72.8703,
-    lightingIndex: 94
+    lng: 72.8703
   });
   const [destLocation, setDestLocation] = useState({
-    id: 'dadar_stn',
     name: 'Dadar Railway Station',
     category: 'Central Transit Interchange',
     lat: 19.0178,
-    lng: 72.8478,
-    lightingIndex: 88
+    lng: 72.8478
   });
 
   const [travelMode, setTravelMode] = useState('Auto/Cab');
@@ -56,7 +50,7 @@ export default function App() {
     setPreferences((prev) => ({ ...prev, travelMode }));
   }, [travelMode]);
 
-  // Computed routes state
+  // Computed routes state (calculated live by FastAPI + OSMnx backend)
   const [routes, setRoutes] = useState([]);
   const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
   const [backendStatus, setBackendStatus] = useState({ connected: false, nodes: 0, edges: 0 });
@@ -64,8 +58,8 @@ export default function App() {
   // Selected route state
   const [selectedRouteId, setSelectedRouteId] = useState('safest');
 
-  // Live OpenStreetMap / Safe Havens Nodes state
-  const [liveOSMNodes, setLiveOSMNodes] = useState(SAFE_HAVENS || []);
+  // Live OpenStreetMap Nodes state
+  const [liveOSMNodes, setLiveOSMNodes] = useState([]);
 
   // Modals state
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -135,7 +129,7 @@ export default function App() {
     }
   };
 
-  // 1. Health check & Graph status for FastAPI backend
+  // 1. Health check & Graph status
   useEffect(() => {
     fetchGraphHealth()
       .then((res) => {
@@ -152,7 +146,7 @@ export default function App() {
       });
   }, []);
 
-  // 2. Fetch Live Safe Havens from backend (Overpass + Google Places), fallback to static data
+  // 2. Fetch Live Safe Havens from backend (Overpass + Google Places)
   useEffect(() => {
     fetchSafeHavens()
       .then((havens) => {
@@ -161,11 +155,11 @@ export default function App() {
         }
       })
       .catch((err) => {
-        console.warn('Backend safe havens query failed, using local presets:', err);
+        console.warn('Could not fetch live OSM safe havens from backend:', err);
       });
   }, []);
 
-  // 3. Compute routes: Try OSMnx backend first; fallback to client routing engine if backend unavailable
+  // 3. Recompute routes via OSMnx backend whenever origin, destination, or preferences change
   useEffect(() => {
     if (!originLocation || !destLocation || !originLocation.lat || !destLocation.lat) return;
 
@@ -177,15 +171,11 @@ export default function App() {
         if (isMounted && computed && computed.length > 0) {
           setRoutes(computed);
           setIsLoadingRoutes(false);
-        } else {
-          throw new Error('Empty backend route response');
         }
       })
       .catch((err) => {
-        console.warn('Backend routing unavailable, calculating via client routing engine:', err);
-        const fallbackRoutes = computeRoutes(originLocation, destLocation, preferences);
+        console.warn('Backend routing failed:', err);
         if (isMounted) {
-          setRoutes(fallbackRoutes);
           setIsLoadingRoutes(false);
         }
       });
@@ -287,7 +277,7 @@ export default function App() {
                 Full Safety Analytics & Corridor Breakdown
               </h2>
               <p className="text-xs text-slate-400">
-                Evaluating spatial parameters from {originLocation?.name} to {destLocation?.name} across Mumbai police divisions.
+                Evaluating spatial parameters from {originLocation?.name} to {destLocation?.name} across 12 Mumbai police divisions.
               </p>
             </div>
 

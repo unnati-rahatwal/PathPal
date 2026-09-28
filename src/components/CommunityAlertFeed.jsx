@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, ThumbsUp, MapPin, AlertCircle, PlusCircle, CheckCircle2, Loader2 } from 'lucide-react';
-import { INITIAL_COMMUNITY_REPORTS } from '../data/mumbaiData';
 import { fetchCommunityReports } from '../services/apiService';
 
 export default function CommunityAlertFeed({ reports: propReports, onOpenReportModal }) {
-  const [localReports, setLocalReports] = useState(INITIAL_COMMUNITY_REPORTS);
+  const [localReports, setLocalReports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -62,7 +61,7 @@ export default function CommunityAlertFeed({ reports: propReports, onOpenReportM
               <div className="flex items-center gap-1.5">
                 <span className="font-bold text-slate-200">{rep.user}</span>
                 <span className="text-[10px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.2 rounded border border-cyan-500/20">
-                  {rep.badge}
+                  {rep.badge || 'Verified Commuter'}
                 </span>
               </div>
               <span className="text-slate-500 text-[10px]">{rep.time}</span>
@@ -92,6 +91,11 @@ export default function CommunityAlertFeed({ reports: propReports, onOpenReportM
             </div>
           </div>
         ))}
+        {reports.length === 0 && !isLoading && (
+          <div className="col-span-3 text-center py-6 text-xs text-slate-500">
+            No live community updates yet. Click &apos;Post Live Update&apos; to submit a road status.
+          </div>
+        )}
       </div>
     </div>
   );

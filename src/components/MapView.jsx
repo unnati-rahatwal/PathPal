@@ -3,7 +3,6 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap } from
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Shield, Sun, AlertTriangle, Fuel, Layers, Navigation, Play, Pause, RotateCcw, Map } from 'lucide-react';
-import { DARK_ZONES_AND_HAZARDS } from '../data/mumbaiData';
 
 // Fix Leaflet default marker icon path issue in Vite React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -30,8 +29,6 @@ export default function MapView({
   setSelectedRouteId,
   originLocation,
   destLocation,
-  originId,
-  destId,
   liveOSMNodes = [],
   isLoadingRoutes = false,
   reports = []
@@ -181,17 +178,19 @@ export default function MapView({
           <span>24/7 Safe Havens</span>
         </button>
 
-        <button
-          onClick={() => setShowHazards(!showHazards)}
-          className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-all ${
-            showHazards
-              ? 'bg-red-500/20 border-red-400 text-red-300'
-              : 'bg-white/5 border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <AlertTriangle className="w-3 h-3 text-red-400" />
-          <span>Dark Zones</span>
-        </button>
+        {reports && reports.length > 0 && (
+          <button
+            onClick={() => setShowHazards(!showHazards)}
+            className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-all ${
+              showHazards
+                ? 'bg-red-500/20 border-red-400 text-red-300'
+                : 'bg-white/5 border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <AlertTriangle className="w-3 h-3 text-red-400" />
+            <span>Community Alerts</span>
+          </button>
+        )}
       </div>
 
       {/* Top Right Map Style Selector */}
@@ -314,12 +313,7 @@ export default function MapView({
           <Popup>
             <div className="text-xs">
               <strong className="text-emerald-400">ORIGIN: {origin.name}</strong>
-              <p className="text-slate-300 text-[11px] mt-1">{origin.description || origin.category}</p>
-              {origin.lightingIndex && (
-                <div className="mt-2 text-[10px] text-slate-400">
-                  Lighting Coverage: <span className="text-amber-300 font-bold">{origin.lightingIndex}%</span>
-                </div>
-              )}
+              <p className="text-slate-300 text-[11px] mt-1">{origin.category || 'Start Point'}</p>
             </div>
           </Popup>
         </Marker>
@@ -329,12 +323,7 @@ export default function MapView({
           <Popup>
             <div className="text-xs">
               <strong className="text-cyan-400">DESTINATION: {dest.name}</strong>
-              <p className="text-slate-300 text-[11px] mt-1">{dest.description || dest.category}</p>
-              {dest.lightingIndex && (
-                <div className="mt-2 text-[10px] text-slate-400">
-                  Lighting Coverage: <span className="text-amber-300 font-bold">{dest.lightingIndex}%</span>
-                </div>
-              )}
+              <p className="text-slate-300 text-[11px] mt-1">{dest.category || 'Target Destination'}</p>
             </div>
           </Popup>
         </Marker>
@@ -376,29 +365,21 @@ export default function MapView({
             );
           })}
 
-        {/* Dark Zones, Hazards & Live Community Reports */}
+        {/* Live Community Hazard Alerts (if reports exist) */}
         {showHazards &&
-          [
-            ...DARK_ZONES_AND_HAZARDS,
-            ...(reports || []).map((rep) => ({
-              id: rep.id,
-              title: rep.category || 'Live Commuter Alert',
-              locationName: rep.location,
-              lat: rep.lat || 19.0760 + (Math.random() * 0.04 - 0.02),
-              lng: rep.lng || 72.8777 + (Math.random() * 0.04 - 0.02),
-              advice: rep.comment
-            }))
-          ].map((hz) => (
-            <Marker key={hz.id} position={[hz.lat, hz.lng]} icon={hazardIcon}>
-              <Popup>
-                <div className="text-xs">
-                  <strong className="text-red-400">⚠️ {hz.title}</strong>
-                  <div className="text-[11px] text-slate-200 font-medium mt-1">{hz.locationName}</div>
-                  <p className="text-slate-400 text-[10px] mt-1">{hz.advice}</p>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+          (reports || [])
+            .filter((rep) => rep.lat && rep.lng)
+            .map((rep) => (
+              <Marker key={rep.id} position={[rep.lat, rep.lng]} icon={hazardIcon}>
+                <Popup>
+                  <div className="text-xs">
+                    <strong className="text-red-400">⚠️ {rep.category || 'Live Commuter Alert'}</strong>
+                    <div className="text-[11px] text-slate-200 font-medium mt-1">{rep.location}</div>
+                    <p className="text-slate-400 text-[10px] mt-1">{rep.comment}</p>
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
       </MapContainer>
     </div>
   );

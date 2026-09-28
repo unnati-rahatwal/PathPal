@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { X, PhoneCall, ShieldAlert, Share2, MapPin, ExternalLink, Check, Copy } from 'lucide-react';
-import { SAFE_HAVENS } from '../data/mumbaiData';
 import { sendEmergencySMS } from '../services/smsService';
 import { getCurrentUserLocation } from '../services/locationService';
 
@@ -12,7 +11,7 @@ export default function SOSGuardModal({ isOpen, onClose, liveOSMNodes = [] }) {
 
   if (!isOpen) return null;
 
-  const dynamicSafeHavens = liveOSMNodes && liveOSMNodes.length > 0 ? liveOSMNodes : SAFE_HAVENS;
+  const dynamicSafeHavens = liveOSMNodes || [];
 
   const emergencyContacts = [
     { name: 'Mumbai Police Central Control', number: '112 / 100', subtitle: 'General Emergency & Beat Marshals' },
@@ -164,27 +163,33 @@ export default function SOSGuardModal({ isOpen, onClose, liveOSMNodes = [] }) {
           </div>
         </div>
 
-        {/* Safe Havens nearby */}
+        {/* Safe Havens nearby (Live OSM) */}
         <div>
           <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1">
             <MapPin className="w-3.5 h-3.5 text-emerald-400" />
             Live 24/7 Verified Safe Havens (OpenStreetMap)
           </h4>
           <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-            {dynamicSafeHavens.map((sh) => (
-              <div
-                key={sh.id}
-                className="bg-white/5 p-2 rounded-lg text-xs flex items-center justify-between border border-white/5"
-              >
-                <div>
-                  <span className="font-bold text-slate-200 block">{sh.name}</span>
-                  <span className="text-[10px] text-emerald-400">{sh.type} • {sh.openHours || '24/7 Active'}</span>
+            {dynamicSafeHavens.length > 0 ? (
+              dynamicSafeHavens.map((sh) => (
+                <div
+                  key={sh.id}
+                  className="bg-white/5 p-2 rounded-lg text-xs flex items-center justify-between border border-white/5"
+                >
+                  <div>
+                    <span className="font-bold text-slate-200 block">{sh.name}</span>
+                    <span className="text-[10px] text-emerald-400">{sh.category || sh.type} • {sh.open_hours || sh.openHours || '24/7 Active'}</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400 bg-black/40 px-2 py-1 rounded">
+                    {sh.contact || '100 / 112'}
+                  </span>
                 </div>
-                <span className="text-[10px] font-mono text-slate-400 bg-black/40 px-2 py-1 rounded">
-                  {sh.contact || '100 / 112'}
-                </span>
+              ))
+            ) : (
+              <div className="text-[11px] text-slate-500 py-2">
+                Live OSM safe havens loading from OpenStreetMap Overpass API...
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
