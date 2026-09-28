@@ -31,9 +31,11 @@ from pathlib import Path
 from typing import Optional
 
 # Ensure backend directory is in sys.path when running from workspace root
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+BACKEND_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(BACKEND_DIR))
 
 from dotenv import load_dotenv
+load_dotenv(BACKEND_DIR / ".env")
 load_dotenv()
 
 from fastapi import FastAPI, HTTPException, Query

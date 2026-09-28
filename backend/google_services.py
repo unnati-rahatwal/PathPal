@@ -13,8 +13,14 @@ from __future__ import annotations
 
 import logging
 import os
-import requests
+from pathlib import Path
 from typing import Any, Optional
+import requests
+from dotenv import load_dotenv
+
+BACKEND_DIR = Path(__file__).resolve().parent
+load_dotenv(BACKEND_DIR / ".env")
+load_dotenv()
 
 logger = logging.getLogger("google_services")
 
