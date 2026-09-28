@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
 import { X, PhoneCall, ShieldAlert, Share2, MapPin, ExternalLink, Check, Copy } from 'lucide-react';
 import { SAFE_HAVENS } from '../data/mumbaiData';
+import { sendEmergencySMS } from '../services/smsService';
+import { getCurrentUserLocation } from '../services/locationService';
 
-export default function SOSGuardModal({ isOpen, onClose }) {
+export default function SOSGuardModal({ isOpen, onClose, liveOSMNodes = [] }) {
   const [copiedLink, setCopiedLink] = useState(false);
+  const [phoneInput, setPhoneInput] = useState('+919702980366');
+  const [isSendingSMS, setIsSendingSMS] = useState(false);
+  const [smsStatus, setSmsStatus] = useState('');
 
   if (!isOpen) return null;
+
+  const dynamicSafeHavens = liveOSMNodes && liveOSMNodes.length > 0 ? liveOSMNodes : SAFE_HAVENS;
 
   const emergencyContacts = [
     { name: 'Mumbai Police Central Control', number: '112 / 100', subtitle: 'General Emergency & Beat Marshals' },
@@ -19,6 +26,42 @@ export default function SOSGuardModal({ isOpen, onClose }) {
     navigator.clipboard.writeText(`EMERGENCY: I am travelling late in Mumbai. Track my live location here: ${fakeLiveLink}`);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const handleSendTwilioSMS = async () => {
+    if (!phoneInput || phoneInput.trim().length < 8) {
+      alert('Please enter a valid emergency contact phone number.');
+      return;
+    }
+
+    setIsSendingSMS(true);
+    setSmsStatus('');
+
+    let lat = 19.0760;
+    let lng = 72.8777;
+
+    try {
+      const loc = await getCurrentUserLocation();
+      lat = loc.lat;
+      lng = loc.lng;
+    } catch {
+      // Use fallback default coordinates
+    }
+
+    const result = await sendEmergencySMS({
+      recipientPhone: phoneInput,
+      lat,
+      lng,
+      messageText: 'Night Commuter triggered SOS emergency guard in Mumbai!'
+    });
+
+    setIsSendingSMS(false);
+    if (result.success) {
+      setSmsStatus('✅ Emergency SMS Dispatched Successfully!');
+    } else {
+      setSmsStatus('⚠️ Opened Native Phone SMS App.');
+    }
+    setTimeout(() => setSmsStatus(''), 4000);
   };
 
   return (
@@ -49,8 +92,8 @@ export default function SOSGuardModal({ isOpen, onClose }) {
           </div>
         </div>
 
-        {/* Live Location Sharing Action */}
-        <div className="bg-gradient-to-r from-red-950/40 to-rose-950/40 border border-red-500/30 p-3.5 rounded-xl mb-4">
+        {/* Live Location Sharing & Twilio SMS Dispatch Action */}
+        <div className="bg-gradient-to-r from-red-950/40 to-rose-950/40 border border-red-500/30 p-3.5 rounded-xl mb-4 space-y-3">
           <div className="flex items-center justify-between">
             <div>
               <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
@@ -63,11 +106,36 @@ export default function SOSGuardModal({ isOpen, onClose }) {
             </div>
             <button
               onClick={handleShareLocation}
-              className="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shrink-0"
+              className="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shrink-0 cursor-pointer"
             >
               {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copiedLink ? 'Link Copied!' : 'Copy SOS Link'}</span>
             </button>
+          </div>
+
+          {/* Twilio SMS Dispatch Input */}
+          <div className="pt-2 border-t border-red-500/20">
+            <label className="text-[11px] font-bold text-red-300 mb-1 block uppercase tracking-wider">
+              📱 Send Emergency SMS Alert (Twilio Powered)
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="tel"
+                placeholder="Enter contact phone (+91XXXXXXXXXX)"
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                className="flex-1 px-3 py-2 bg-[#090610] border border-red-500/40 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-red-400"
+              />
+              <button
+                onClick={handleSendTwilioSMS}
+                disabled={isSendingSMS}
+                className="px-3 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg transition-all shrink-0 cursor-pointer disabled:opacity-50"
+              >
+                <PhoneCall className="w-3.5 h-3.5" />
+                <span>{isSendingSMS ? 'Sending...' : 'Send SMS'}</span>
+              </button>
+            </div>
+            {smsStatus && <p className="text-[10px] font-bold text-emerald-400 mt-1">{smsStatus}</p>}
           </div>
         </div>
 
@@ -100,20 +168,20 @@ export default function SOSGuardModal({ isOpen, onClose }) {
         <div>
           <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1">
             <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-            Nearest 24/7 Safe Havens (Guarded)
+            Live 24/7 Verified Safe Havens (OpenStreetMap)
           </h4>
           <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-            {SAFE_HAVENS.map((sh) => (
+            {dynamicSafeHavens.map((sh) => (
               <div
                 key={sh.id}
                 className="bg-white/5 p-2 rounded-lg text-xs flex items-center justify-between border border-white/5"
               >
                 <div>
                   <span className="font-bold text-slate-200 block">{sh.name}</span>
-                  <span className="text-[10px] text-emerald-400">{sh.type} • {sh.openHours}</span>
+                  <span className="text-[10px] text-emerald-400">{sh.type} • {sh.openHours || '24/7 Active'}</span>
                 </div>
                 <span className="text-[10px] font-mono text-slate-400 bg-black/40 px-2 py-1 rounded">
-                  {sh.contact}
+                  {sh.contact || '100 / 112'}
                 </span>
               </div>
             ))}

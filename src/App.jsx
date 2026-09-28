@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Navbar from './components/Navbar';
+import LandingHero from './components/LandingHero';
 import RouteSelector from './components/RouteSelector';
 import MapView from './components/MapView';
 import RouteCardList from './components/RouteCardList';
@@ -8,24 +9,36 @@ import CommunityAlertFeed from './components/CommunityAlertFeed';
 import ReportModal from './components/ReportModal';
 import SOSGuardModal from './components/SOSGuardModal';
 import { fetchRoutes, fetchSafeHavens, fetchGraphHealth } from './services/apiService';
+import { computeRoutes } from './services/routingEngine';
+import { supabase, isSupabaseConfigured } from './services/supabaseClient';
+import { SAFE_HAVENS, INITIAL_COMMUNITY_REPORTS } from './data/mumbaiData';
+import { MessageSquarePlus } from 'lucide-react';
 
 export default function App() {
-  // Active Tab state ('planner', 'inspector', 'community')
-  const [activeTab, setActiveTab] = useState('planner');
+  // Active Tab state ('home', 'planner', 'inspector', 'community')
+  const [activeTab, setActiveTab] = useState('home');
+
+  // Community Reports state with live Supabase sync
+  const [reports, setReports] = useState(INITIAL_COMMUNITY_REPORTS);
 
   // Navigation & Location state (dynamic search & pin coordinates)
   const [originLocation, setOriginLocation] = useState({
+    id: 'bkc',
     name: 'Bandra Kurla Complex (BKC)',
     category: 'Commercial Hub, Bandra East',
     lat: 19.0688,
-    lng: 72.8703
+    lng: 72.8703,
+    lightingIndex: 94
   });
   const [destLocation, setDestLocation] = useState({
+    id: 'dadar_stn',
     name: 'Dadar Railway Station',
     category: 'Central Transit Interchange',
     lat: 19.0178,
-    lng: 72.8478
+    lng: 72.8478,
+    lightingIndex: 88
   });
+
   const [travelMode, setTravelMode] = useState('Auto/Cab');
   const [activeProfile, setActiveProfile] = useState('solo_female');
 
@@ -38,7 +51,12 @@ export default function App() {
     travelMode: 'Auto/Cab'
   });
 
-  // Computed routes state (calculated live by FastAPI + OSMnx backend)
+  // Keep travelMode synced with preferences
+  useEffect(() => {
+    setPreferences((prev) => ({ ...prev, travelMode }));
+  }, [travelMode]);
+
+  // Computed routes state
   const [routes, setRoutes] = useState([]);
   const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
   const [backendStatus, setBackendStatus] = useState({ connected: false, nodes: 0, edges: 0 });
@@ -46,8 +64,8 @@ export default function App() {
   // Selected route state
   const [selectedRouteId, setSelectedRouteId] = useState('safest');
 
-  // Live OpenStreetMap Nodes state
-  const [liveOSMNodes, setLiveOSMNodes] = useState([]);
+  // Live OpenStreetMap / Safe Havens Nodes state
+  const [liveOSMNodes, setLiveOSMNodes] = useState(SAFE_HAVENS || []);
 
   // Modals state
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -56,7 +74,68 @@ export default function App() {
   // Live Mumbai Time state
   const [mumbaiTime, setMumbaiTime] = useState('');
 
-  // 1. Health check & Graph status
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const options = {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      };
+      setMumbaiTime(new Intl.DateTimeFormat('en-IN', options).format(now));
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch live reports from Supabase if configured, subscribe to realtime updates
+  useEffect(() => {
+    if (isSupabaseConfigured && supabase) {
+      supabase
+        .from('reports')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .then(({ data, error }) => {
+          if (!error && data && data.length > 0) {
+            setReports(data);
+          }
+        });
+
+      const channel = supabase
+        .channel('public:reports')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'reports' },
+          (payload) => {
+            if (payload.new) {
+              setReports((prev) => [payload.new, ...prev]);
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, []);
+
+  const handleAddReport = async (newReport) => {
+    setReports((prev) => [newReport, ...prev]);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('reports').insert([newReport]);
+      } catch (err) {
+        console.warn('Supabase report save fallback:', err);
+      }
+    }
+  };
+
+  // 1. Health check & Graph status for FastAPI backend
   useEffect(() => {
     fetchGraphHealth()
       .then((res) => {
@@ -73,7 +152,7 @@ export default function App() {
       });
   }, []);
 
-  // 2. Fetch Live Safe Havens from backend (Overpass + Google Places)
+  // 2. Fetch Live Safe Havens from backend (Overpass + Google Places), fallback to static data
   useEffect(() => {
     fetchSafeHavens()
       .then((havens) => {
@@ -82,11 +161,11 @@ export default function App() {
         }
       })
       .catch((err) => {
-        console.warn('Could not fetch live OSM safe havens from backend:', err);
+        console.warn('Backend safe havens query failed, using local presets:', err);
       });
   }, []);
 
-  // 3. Recompute routes via OSMnx backend whenever origin, destination, or preferences change
+  // 3. Compute routes: Try OSMnx backend first; fallback to client routing engine if backend unavailable
   useEffect(() => {
     if (!originLocation || !destLocation || !originLocation.lat || !destLocation.lat) return;
 
@@ -98,11 +177,15 @@ export default function App() {
         if (isMounted && computed && computed.length > 0) {
           setRoutes(computed);
           setIsLoadingRoutes(false);
+        } else {
+          throw new Error('Empty backend route response');
         }
       })
       .catch((err) => {
-        console.warn('Backend routing failed:', err);
+        console.warn('Backend routing unavailable, calculating via client routing engine:', err);
+        const fallbackRoutes = computeRoutes(originLocation, destLocation, preferences);
         if (isMounted) {
+          setRoutes(fallbackRoutes);
           setIsLoadingRoutes(false);
         }
       });
@@ -116,9 +199,6 @@ export default function App() {
     return routes.find((r) => r.id === selectedRouteId) || routes[0];
   }, [routes, selectedRouteId]);
 
-  const originName = originLocation?.name || 'Origin';
-  const destName = destLocation?.name || 'Destination';
-
   return (
     <div className="min-h-screen bg-[#050811] text-slate-100 flex flex-col font-sans">
       {/* Top Navbar */}
@@ -131,9 +211,19 @@ export default function App() {
         backendStatus={backendStatus}
       />
 
-      {/* Main Content Area with Generous Spacing */}
+      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 pb-12">
-        {/* TAB 1: Route Planner & Map */}
+        {/* TAB 0: Home & Landing Hero */}
+        {activeTab === 'home' && (
+          <LandingHero
+            onLaunchPlanner={() => setActiveTab('planner')}
+            onOpenSOS={() => setIsSOSOpen(true)}
+            onOpenReportModal={() => setIsReportModalOpen(true)}
+            mumbaiTime={mumbaiTime}
+          />
+        )}
+
+        {/* TAB 1: Route Planner & Interactive Map */}
         {activeTab === 'planner' && (
           <div className="space-y-6">
             {/* Top Workspace Grid: Planner Form (5 cols) + Interactive Map (7 cols) */}
@@ -163,6 +253,7 @@ export default function App() {
                   destLocation={destLocation}
                   liveOSMNodes={liveOSMNodes}
                   isLoadingRoutes={isLoadingRoutes}
+                  reports={reports}
                 />
               </div>
             </div>
@@ -196,7 +287,7 @@ export default function App() {
                 Full Safety Analytics & Corridor Breakdown
               </h2>
               <p className="text-xs text-slate-400">
-                Evaluating spatial parameters from {originLocation?.name} to {destLocation?.name} across 12 Mumbai police divisions.
+                Evaluating spatial parameters from {originLocation?.name} to {destLocation?.name} across Mumbai police divisions.
               </p>
             </div>
 
@@ -222,13 +313,13 @@ export default function App() {
               </div>
               <button
                 onClick={() => setIsReportModalOpen(true)}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 hover:opacity-90 transition-all"
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 hover:opacity-90 transition-all cursor-pointer"
               >
                 + Submit Live Update
               </button>
             </div>
 
-            <CommunityAlertFeed onOpenReportModal={() => setIsReportModalOpen(true)} />
+            <CommunityAlertFeed reports={reports} onOpenReportModal={() => setIsReportModalOpen(true)} />
           </div>
         )}
       </main>
@@ -236,20 +327,30 @@ export default function App() {
       {/* Footer */}
       <footer className="bg-[#040710] border-t border-white/5 py-6 text-center text-xs text-slate-500 mt-auto px-4">
         <p className="max-w-4xl mx-auto">
-          Balikaman: Smart Night-Time Route Planning Engine for Mumbai Commuters • Connected live to OpenStreetMap & OpenSpatial APIs.
+          PathPal: Smart Night-Time Route Planning Engine for Mumbai Commuters • Connected live to OpenStreetMap & OpenSpatial APIs.
         </p>
       </footer>
+
+      {/* Persistent Floating Action Button: + Submit Live Report */}
+      <button
+        onClick={() => setIsReportModalOpen(true)}
+        className="fixed bottom-6 right-6 z-[1200] px-5 py-3.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-2xl shadow-amber-400/50 hover:scale-105 active:scale-95 transition-all cursor-pointer border border-amber-200/80"
+      >
+        <MessageSquarePlus className="w-4 h-4 text-slate-950 fill-current animate-pulse" />
+        <span>+ Submit Live Report</span>
+      </button>
 
       {/* Modals */}
       <ReportModal
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
-        onAddReport={() => {}}
+        onAddReport={handleAddReport}
       />
 
       <SOSGuardModal
         isOpen={isSOSOpen}
         onClose={() => setIsSOSOpen(false)}
+        liveOSMNodes={liveOSMNodes}
       />
     </div>
   );

@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap } from
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Shield, Sun, AlertTriangle, Fuel, Layers, Navigation, Play, Pause, RotateCcw, Map } from 'lucide-react';
+import { DARK_ZONES_AND_HAZARDS } from '../data/mumbaiData';
 
 // Fix Leaflet default marker icon path issue in Vite React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -29,8 +30,11 @@ export default function MapView({
   setSelectedRouteId,
   originLocation,
   destLocation,
+  originId,
+  destId,
   liveOSMNodes = [],
-  isLoadingRoutes = false
+  isLoadingRoutes = false,
+  reports = []
 }) {
   const [showLightingHeatmap, setShowLightingHeatmap] = useState(true);
   const [showPolicePosts, setShowPolicePosts] = useState(true);
@@ -44,8 +48,8 @@ export default function MapView({
   const [isSimulating, setIsSimulating] = useState(false);
   const [simStepIndex, setSimStepIndex] = useState(0);
 
-  const origin = originLocation || { name: 'Start Location', lat: 19.0688, lng: 72.8703 };
-  const dest = destLocation || { name: 'Destination', lat: 19.0178, lng: 72.8478 };
+  const origin = originLocation || { name: 'Start Location', lat: 19.0688, lng: 72.8703, lightingIndex: 90 };
+  const dest = destLocation || { name: 'Destination', lat: 19.0178, lng: 72.8478, lightingIndex: 88 };
 
   const mapCenter = [(origin.lat + dest.lat) / 2, (origin.lng + dest.lng) / 2];
   const currentSelectedRoute = routes.find((r) => r.id === selectedRouteId) || routes[0];
@@ -123,7 +127,7 @@ export default function MapView({
   });
 
   return (
-    <div className="relative w-full h-[550px] rounded-2xl overflow-hidden glass-panel border border-white/10 shadow-2xl flex flex-col">
+    <div id="map-view-container" className="relative w-full h-[550px] rounded-2xl overflow-hidden glass-panel border border-white/10 shadow-2xl flex flex-col">
       {/* Route Computing Loading Indicator */}
       {isLoadingRoutes && (
         <div className="absolute inset-0 z-[1200] bg-black/40 backdrop-blur-[2px] flex items-center justify-center transition-all animate-fade-in pointer-events-none">
@@ -219,13 +223,13 @@ export default function MapView({
               setIsSimulating(true);
             }
           }}
-          className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all ${
+          className={`px-3.5 py-1.5 rounded-lg font-black text-xs flex items-center gap-1.5 cursor-pointer transition-all ${
             isSimulating
-              ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
-              : 'bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 hover:opacity-90 shadow-lg shadow-cyan-500/20'
+              ? 'bg-amber-400 text-slate-950 hover:bg-amber-300'
+              : 'bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-lg shadow-cyan-400/30'
           }`}
         >
-          {isSimulating ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+          {isSimulating ? <Pause className="w-3.5 h-3.5 text-slate-950" /> : <Play className="w-3.5 h-3.5 text-slate-950" />}
           <span>{isSimulating ? 'Pause Journey' : 'Simulate Live Journey'}</span>
         </button>
         {simStepIndex > 0 && (
@@ -310,10 +314,12 @@ export default function MapView({
           <Popup>
             <div className="text-xs">
               <strong className="text-emerald-400">ORIGIN: {origin.name}</strong>
-              <p className="text-slate-300 text-[11px] mt-1">{origin.description}</p>
-              <div className="mt-2 text-[10px] text-slate-400">
-                Lighting Coverage: <span className="text-amber-300 font-bold">{origin.lightingIndex}%</span>
-              </div>
+              <p className="text-slate-300 text-[11px] mt-1">{origin.description || origin.category}</p>
+              {origin.lightingIndex && (
+                <div className="mt-2 text-[10px] text-slate-400">
+                  Lighting Coverage: <span className="text-amber-300 font-bold">{origin.lightingIndex}%</span>
+                </div>
+              )}
             </div>
           </Popup>
         </Marker>
@@ -323,10 +329,12 @@ export default function MapView({
           <Popup>
             <div className="text-xs">
               <strong className="text-cyan-400">DESTINATION: {dest.name}</strong>
-              <p className="text-slate-300 text-[11px] mt-1">{dest.description}</p>
-              <div className="mt-2 text-[10px] text-slate-400">
-                Lighting Coverage: <span className="text-amber-300 font-bold">{dest.lightingIndex}%</span>
-              </div>
+              <p className="text-slate-300 text-[11px] mt-1">{dest.description || dest.category}</p>
+              {dest.lightingIndex && (
+                <div className="mt-2 text-[10px] text-slate-400">
+                  Lighting Coverage: <span className="text-amber-300 font-bold">{dest.lightingIndex}%</span>
+                </div>
+              )}
             </div>
           </Popup>
         </Marker>
@@ -338,7 +346,7 @@ export default function MapView({
               <div className="text-xs">
                 <strong className="text-purple-400">Live Night Commuter</strong>
                 <div className="text-[10px] text-slate-300 mt-1">
-                  En Route via {currentSelectedRoute.title} ({Math.round((simStepIndex / (currentSelectedRoute.waypoints.length - 1)) * 100)}% Complete)
+                  En Route via {currentSelectedRoute?.title || 'Route'} ({Math.round((simStepIndex / Math.max(1, (currentSelectedRoute?.waypoints?.length || 1) - 1)) * 100)}% Complete)
                 </div>
               </div>
             </Popup>
@@ -367,6 +375,30 @@ export default function MapView({
               </Marker>
             );
           })}
+
+        {/* Dark Zones, Hazards & Live Community Reports */}
+        {showHazards &&
+          [
+            ...DARK_ZONES_AND_HAZARDS,
+            ...(reports || []).map((rep) => ({
+              id: rep.id,
+              title: rep.category || 'Live Commuter Alert',
+              locationName: rep.location,
+              lat: rep.lat || 19.0760 + (Math.random() * 0.04 - 0.02),
+              lng: rep.lng || 72.8777 + (Math.random() * 0.04 - 0.02),
+              advice: rep.comment
+            }))
+          ].map((hz) => (
+            <Marker key={hz.id} position={[hz.lat, hz.lng]} icon={hazardIcon}>
+              <Popup>
+                <div className="text-xs">
+                  <strong className="text-red-400">⚠️ {hz.title}</strong>
+                  <div className="text-[11px] text-slate-200 font-medium mt-1">{hz.locationName}</div>
+                  <p className="text-slate-400 text-[10px] mt-1">{hz.advice}</p>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
       </MapContainer>
     </div>
   );

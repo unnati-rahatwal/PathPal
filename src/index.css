@@ -146,7 +146,30 @@ h1, h2, h3, h4, h5, h6 {
   background: rgba(11, 16, 28, 0.95) !important;
 }
 
-/* Styled Inputs */
+/* Styled Inputs & Selects */
 input[type="range"] {
   accent-color: var(--accent-cyan);
 }
+
+select option {
+  background-color: #0b1224 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Tailwind v4 Gradient Utility Compatibility */
+@utility bg-gradient-to-r {
+  background-image: linear-gradient(to right, var(--tw-gradient-stops, var(--tw-gradient-from), var(--tw-gradient-to)));
+}
+@utility bg-gradient-to-l {
+  background-image: linear-gradient(to left, var(--tw-gradient-stops, var(--tw-gradient-from), var(--tw-gradient-to)));
+}
+@utility bg-gradient-to-t {
+  background-image: linear-gradient(to top, var(--tw-gradient-stops, var(--tw-gradient-from), var(--tw-gradient-to)));
+}
+@utility bg-gradient-to-b {
+  background-image: linear-gradient(to bottom, var(--tw-gradient-stops, var(--tw-gradient-from), var(--tw-gradient-to)));
+}
+@utility bg-gradient-to-tr {
+  background-image: linear-gradient(to top right, var(--tw-gradient-stops, var(--tw-gradient-from), var(--tw-gradient-to)));
+}
+

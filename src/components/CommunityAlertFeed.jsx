@@ -1,29 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, ThumbsUp, MapPin, AlertCircle, PlusCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { INITIAL_COMMUNITY_REPORTS } from '../data/mumbaiData';
 import { fetchCommunityReports } from '../services/apiService';
 
-export default function CommunityAlertFeed({ onOpenReportModal }) {
-  const [reports, setReports] = useState([]);
+export default function CommunityAlertFeed({ reports: propReports, onOpenReportModal }) {
+  const [localReports, setLocalReports] = useState(INITIAL_COMMUNITY_REPORTS);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    setIsLoading(true);
-    fetchCommunityReports()
-      .then((data) => {
-        if (data && data.length > 0) {
-          setReports(data);
-        }
-        setIsLoading(false);
-      })
-      .catch(() => {
-        setIsLoading(false);
-      });
-  }, []);
+    if (!propReports || propReports.length === 0) {
+      setIsLoading(true);
+      fetchCommunityReports()
+        .then((data) => {
+          if (data && data.length > 0) {
+            setLocalReports(data);
+          }
+          setIsLoading(false);
+        })
+        .catch(() => {
+          setIsLoading(false);
+        });
+    }
+  }, [propReports]);
+
+  const reports = (propReports && propReports.length > 0) ? propReports : localReports;
 
   const handleUpvote = (id) => {
-    setReports((prev) =>
+    setLocalReports((prev) =>
       prev.map((rep) =>
-        rep.id === id ? { ...rep, upvotes: rep.upvotes + 1 } : rep
+        rep.id === id ? { ...rep, upvotes: (rep.upvotes || 0) + 1 } : rep
       )
     );
   };
@@ -36,6 +41,7 @@ export default function CommunityAlertFeed({ onOpenReportModal }) {
           <h3 className="text-xs font-bold text-white uppercase tracking-wider">
             Live Community Night Feed (Mumbai Commuters)
           </h3>
+          {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />}
         </div>
         <button
           onClick={onOpenReportModal}
@@ -73,7 +79,7 @@ export default function CommunityAlertFeed({ onOpenReportModal }) {
               <span className="text-slate-400">
                 Lighting:{' '}
                 <span className="text-amber-400 font-bold">
-                  {'★'.repeat(rep.lightingRating)}{'☆'.repeat(5 - rep.lightingRating)}
+                  {'★'.repeat(rep.lightingRating || 4)}{'☆'.repeat(5 - (rep.lightingRating || 4))}
                 </span>
               </span>
               <button
@@ -81,7 +87,7 @@ export default function CommunityAlertFeed({ onOpenReportModal }) {
                 className="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-slate-300 flex items-center gap-1 transition-colors"
               >
                 <ThumbsUp className="w-3 h-3 text-cyan-400" />
-                <span>{rep.upvotes}</span>
+                <span>{rep.upvotes || 0}</span>
               </button>
             </div>
           </div>
