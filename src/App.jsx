@@ -217,29 +217,40 @@ export default function App() {
         )}
 
         {activeTab === 'howItWorks' && (
-          <HowItWorks onLaunchPlanner={() => setActiveTab('planner')} />
+          <HowItWorks
+            onLaunchPlanner={() => setActiveTab('planner')}
+            onNavigate={(tab) => setActiveTab(tab)}
+          />
         )}
 
         {activeTab === 'tourist' && (
           <TouristMode
             onLaunchPlanner={() => setActiveTab('planner')}
+            onNavigate={(tab) => setActiveTab(tab)}
             onOpenSOS={() => setIsSOSOpen(true)}
           />
         )}
 
         {activeTab === 'corporate' && (
-          <CorporateMode onLaunchPlanner={() => setActiveTab('planner')} />
+          <CorporateMode
+            onLaunchPlanner={() => setActiveTab('planner')}
+            onNavigate={(tab) => setActiveTab(tab)}
+          />
         )}
 
         {activeTab === 'dashboard' && (
           <Dashboard
             onLaunchPlanner={() => setActiveTab('planner')}
             onSelectSavedRoute={handleSelectSavedRoute}
+            onNavigate={(tab) => setActiveTab(tab)}
           />
         )}
 
         {activeTab === 'report' && (
-          <ReportHazard onReportSubmitted={handleReportSubmitted} />
+          <ReportHazard
+            onReportSubmitted={handleReportSubmitted}
+            onNavigate={(tab) => setActiveTab(tab)}
+          />
         )}
 
         {activeTab === 'onboarding' && (

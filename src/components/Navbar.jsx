@@ -13,7 +13,7 @@ export default function Navbar({
     { id: 'detail', label: 'Route Detail' },
     { id: 'howItWorks', label: 'How It Works' },
     { id: 'tourist', label: 'Tourist Mode' },
-    { id: 'corporate', label: 'Corporate' },
+    { id: 'corporate', label: 'For Business' },
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'report', label: 'Report Hazard' }
   ];

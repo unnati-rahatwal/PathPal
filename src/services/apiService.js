@@ -87,6 +87,7 @@ function normaliseRoute(r) {
     highlights:     r.highlights     ?? [],
     hazardWarnings: r.hazard_warnings ?? [],
     nodeCount:      r.node_count,
+    steps:          r.steps          ?? [],
     source: 'osmnx',
   };
 }
@@ -153,6 +154,8 @@ export async function submitCommunityReport(report) {
     }),
   });
 }
+
+export const postCommunityReport = submitCommunityReport;
 
 // ── Google Maps Platform Services ───────────────────────────────────────────
 

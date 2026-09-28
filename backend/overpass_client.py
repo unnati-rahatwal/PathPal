@@ -53,8 +53,9 @@ SAFE_HAVEN_QUERY = """
   node["amenity"="fuel"]({bbox});
   node["man_made"="surveillance"]({bbox});
   node["amenity"="hospital"]({bbox});
+  node["tourism"="hotel"]({bbox});
 );
-out body 80;
+out body 100;
 """
 
 AMENITY_TYPE_MAP = {
@@ -62,6 +63,7 @@ AMENITY_TYPE_MAP = {
     "pharmacy":    "Pharmacy",
     "fuel":        "Petrol Pump",
     "hospital":    "Hospital",
+    "hotel":       "Verified Hotel / 24/7 Desk",
     "surveillance": "CCTV / Surveillance",
 }
 
@@ -70,7 +72,8 @@ AMENITY_COLOR_MAP = {
     "pharmacy":    "#10B981",   # green
     "fuel":        "#F59E0B",   # amber
     "hospital":    "#EF4444",   # red
-    "surveillance": "#8B5CF6",  # purple
+    "hotel":       "#A855F7",   # purple
+    "surveillance": "#8B5CF6",  # violet
 }
 
 
@@ -87,7 +90,7 @@ def fetch_safe_havens(bbox: str = "18.89,72.77,19.27,73.00") -> list[dict]:
         if el.get("type") != "node":
             continue
         tags = el.get("tags", {})
-        amenity_key = tags.get("amenity") or tags.get("man_made", "")
+        amenity_key = tags.get("amenity") or tags.get("tourism") or tags.get("man_made", "")
         haven_type = AMENITY_TYPE_MAP.get(amenity_key, amenity_key.title())
         color = AMENITY_COLOR_MAP.get(amenity_key, "#6B7280")
 

@@ -128,14 +128,14 @@ def fetch_verified_safe_havens(
     }
 
     payload = {
-        "includedTypes": ["pharmacy", "hospital", "police", "gas_station"],
+        "includedTypes": ["pharmacy", "hospital", "police", "gas_station", "hotel", "lodging"],
         "locationRestriction": {
             "circle": {
                 "center": {"latitude": lat, "longitude": lng},
                 "radius": float(radius_meters),
             }
         },
-        "maxResultCount": 10,
+        "maxResultCount": 16,
     }
 
     try:
@@ -167,6 +167,9 @@ def fetch_verified_safe_havens(
             elif "police" in primary_type or "government" in primary_type:
                 cat_label = "Mumbai Police Station / Chowki"
                 color = "#3B82F6"
+            elif "hotel" in primary_type or "lodging" in primary_type:
+                cat_label = "Hotel / 24/7 Front Desk"
+                color = "#A855F7"
             elif "pharmacy" in primary_type or "drugstore" in primary_type:
                 cat_label = "24/7 Medical Store / Pharmacy"
                 color = "#10B981"
