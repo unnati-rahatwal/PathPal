@@ -500,7 +500,7 @@ export default function Dashboard({ onLaunchPlanner, onSelectSavedRoute, onNavig
           <div className="user-row">
             <div className="dash-avatar">🌙</div>
             <div>
-              <div className="dash-user-name">Namya Shah</div>
+              <div className="dash-user-name">Ananya Shah</div>
               <div className="dash-user-sub">Commuter Pro · Mumbai NightSafe Member · Bandra Hub</div>
             </div>
             <div className="dash-user-actions">
